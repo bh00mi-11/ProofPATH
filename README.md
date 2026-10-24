@@ -26,8 +26,8 @@ npx expo start
 
 - `mobile/src/types/proofpath.types.ts` — shared app-side TypeScript contract.
 - `mobile/src/mocks/demo-case.ts` — fictional demo case and prepared simulation.
-- `mobile/src/services/` — mock service and disconnected API service boundary.
-- `mobile/src/context/case-context.tsx` — session-only screen state.
+- `mobile/src/services/` — mock service boundary; no live API connection.
+- `mobile/src/context/CaseContext.tsx` — session-only screen state.
 - `mobile/src/app/` — Expo Router screens.
 
 API integration, persistent storage, evidence ingestion, Guardian Mode, Support directory, and real report export are future work.
