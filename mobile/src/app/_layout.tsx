@@ -1,5 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { useState, useEffect } from 'react';
 import { Platform, useColorScheme } from 'react-native';
 
 import AppTabs from '@/components/app-tabs';
@@ -11,6 +12,16 @@ if (Platform.OS !== 'web') {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [mounted, setMounted] = useState(Platform.OS !== 'web');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <CaseProvider>
