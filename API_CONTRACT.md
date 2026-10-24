@@ -99,6 +99,10 @@ Response:
 Simulates what happens when a piece of evidence is removed, disputed, or corrected, **without modifying the original stored baseline data**.
 
 ### `POST /api/scenarios/simulate`
+Supports both:
+- **Evidence-level exclusion**: pass an artifact ID (e.g. `art_...`) as `target_id` with `enabled: false`. Every observation derived from that artifact becomes disabled.
+- **Observation-level exclusion / correction**: pass an observation ID (e.g. `obs_01`) as `target_id`.
+
 Request Body:
 ```json
 {
@@ -106,9 +110,9 @@ Request Body:
   "scenario_name": "What if screenshot was excluded?",
   "overrides": [
     {
-      "target_id": "obs_01",
+      "target_id": "art_threat_screen",
       "enabled": false,
-      "reason": "Simulating scenario where screenshot timestamp is omitted"
+      "reason": "Excluding entire threat screenshot artifact"
     },
     {
       "target_id": "obs_06_manual",
@@ -126,17 +130,45 @@ Response:
   "status": "success",
   "scenario_name": "What if screenshot was excluded?",
   "overrides_applied": 2,
+  "affected_claims_count": 1,
+  "affected_claim_ids": ["claim_05"],
   "claims": [
     {
       "id": "claim_01",
       "state": "SUPPORTED",
-      "reason": "Supported by 1 verified evidence observation(s).",
-      "active_sources_count": 1
+      "reason": "Supported by 1 active observation(s).",
+      "active_sources_count": 1,
+      "supporting_observations": ["obs_04"],
+      "contradicting_observations": []
     },
     {
       "id": "claim_05",
       "state": "SUPPORTED",
-      "reason": "Supported by 2 verified evidence observation(s)."
+      "reason": "Supported by 2 active observation(s).",
+      "active_sources_count": 2,
+      "supporting_observations": ["obs_01", "obs_06_manual"],
+      "contradicting_observations": []
+    }
+  ],
+  "baseline_claims": [
+    {
+      "id": "claim_01",
+      "state": "SUPPORTED",
+      "active_sources_count": 2
+    }
+  ],
+  "changes": [
+    {
+      "claim_id": "claim_05",
+      "claim_text": "Incident took place during evening hours...",
+      "baseline_state": "CONFLICTED",
+      "scenario_state": "SUPPORTED",
+      "changed": true,
+      "baseline_supporting": ["obs_01", "obs_06_manual"],
+      "scenario_supporting": ["obs_01", "obs_06_manual"],
+      "baseline_contradicting": [],
+      "scenario_contradicting": [],
+      "reason": "State transitioned from CONFLICTED to SUPPORTED."
     }
   ]
 }
@@ -178,18 +210,68 @@ Response:
 
 ---
 
-## 6. Disclosure Compiler (Safe PDF Export & Privacy Check)
-### `POST /api/export/pdf`
+## 6. Disclosure Preview & Recipient-Aware PDF Compiler
+ProofPath applies a server-side allowlist model according to three predefined recipient types:
+- `TRUSTED_CONTACT`: Overview statements & categories; strictly suppresses forensic observation details, raw timestamps, internal IDs, and SHA-256 hashes.
+- `SUPPORT_ORGANIZATION`: Dates, categories, support notes, observation counts; suppresses raw identifiers and hashes.
+- `LEGAL_PROFESSIONAL`: Full structured chronological timeline, observation source types, link relations, and cryptographic SHA-256 proofs.
+
+Raw image attachments are strictly excluded across all types to prevent visual metadata leakage.
+
+### `POST /api/disclosure/preview`
+Inspects what will be included vs. excluded for the given recipient type before report generation.
+
 Request Body:
 ```json
 {
   "case_id": "case_demo_01",
+  "recipient_type": "TRUSTED_CONTACT",
+  "redacted_terms": ["Executive X"]
+}
+```
+
+Response:
+```json
+{
+  "status": "success",
+  "preview": {
+    "recipient_type": "TRUSTED_CONTACT",
+    "approved_fields": ["case_title", "category", "claim_text", "summary_note", "verification_state"],
+    "excluded_fields": ["evidence_sha256", "incident_date", "incident_time", "observation_details", "relation"],
+    "warnings": [
+      "Sensitive forensic identifiers, exact timestamps, and artifact SHA-256 hashes are omitted for personal privacy.",
+      "Raw evidence media attachments are excluded.",
+      "Notice: This report facilitates emotional/personal support and is not formatted for evidentiary submission."
+    ],
+    "included_claims_count": 5,
+    "raw_images_excluded": true,
+    "redacted_terms_count": 1,
+    "disclaimer": "Notice: ProofPath provides deterministic integrity and structured disclosure; it does not promise absolute anonymity."
+  }
+}
+```
+
+---
+
+### `POST /api/export/pdf`
+Compiles an allowlisted, multi-page, non-clipped PDF document. Requires explicit confirmation (`confirmed_config: true`) acknowledging review of the disclosure preview.
+
+Request Body:
+```json
+{
+  "case_id": "case_demo_01",
+  "recipient_type": "LEGAL_PROFESSIONAL",
   "redacted_terms": ["Executive X", "Manager"],
-  "include_unverified": true
+  "include_unverified": true,
+  "confirmed_config": true
 }
 ```
 
 Response:
 * Binary stream: `application/pdf`
-* Headers: `Content-Disposition: attachment; filename=ProofPath_Disclosure_case_demo_01.pdf`
-* Note: If any redacted term appears in the rendered output, the request fails with `HTTP 400 Privacy check failed!`.
+* Headers: `Content-Disposition: attachment; filename=ProofPath_Disclosure_case_demo_01_legal_professional.pdf`
+* Safety Enforcement:
+  - If `confirmed_config` is `false`, returns `HTTP 400 Confirmation required`.
+  - Scans both extracted document text and document metadata against `redacted_terms` and seeded sensitive identifiers.
+  - If any forbidden term is detected, download is aborted and returns `HTTP 400 Privacy check failed!`.
+
