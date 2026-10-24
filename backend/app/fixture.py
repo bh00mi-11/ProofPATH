@@ -26,10 +26,13 @@ def seed_demo_fixture(db_conn, vault: EvidenceVault) -> str:
         )
 
         # 2. Store 4 Synthetic Vault Artifacts (2 screenshots, 1 chat, 1 document)
-        art1 = vault.store_file("threat_message_screenshot.png", b"SYNTHETIC_IMAGE_BYTES_SLACK_DM_SCREENSHOT_OCT22")
-        art2 = vault.store_file("followup_call_screenshot.png", b"SYNTHETIC_IMAGE_BYTES_CALL_LOG_SCREENSHOT_OCT22")
+        # Using real magic byte headers so content inspection succeeds
+        png_header = b"\x89PNG\r\n\x1a\n"
+        pdf_header = b"%PDF-1.4\n"
+        art1 = vault.store_file("threat_message_screenshot.png", png_header + b"SYNTHETIC_IMAGE_BYTES_SLACK_DM_SCREENSHOT_OCT22")
+        art2 = vault.store_file("followup_call_screenshot.png", png_header + b"SYNTHETIC_IMAGE_BYTES_CALL_LOG_SCREENSHOT_OCT22")
         art3 = vault.store_file("chat_export_whatsapp.txt", b"2026-10-22 21:45 [Sender: Manager] You better not report this meeting.")
-        art4 = vault.store_file("hr_formal_grievance.pdf", b"OFFICIAL_HR_RECEIPT_OCT23_TIMESTAMP_CONFIRMED")
+        art4 = vault.store_file("hr_formal_grievance.pdf", pdf_header + b"OFFICIAL_HR_RECEIPT_OCT23_TIMESTAMP_CONFIRMED")
 
         artifacts_data = [
             (art1["artifact_id"], case_id, art1["filename"], "screenshot", art1["vault_path"], art1["sha256"], art1["file_size"]),
