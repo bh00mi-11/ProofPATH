@@ -1,25 +1,45 @@
 import React, { useState } from 'react';
-import { StyleSheet, ScrollView, View, TextInput, Pressable, useColorScheme } from 'react-native';
+import { StyleSheet, ScrollView, View, TextInput, Pressable, useColorScheme, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, BrandColors, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTranslation } from '@/context/LanguageContext';
+import { useCaseState } from '@/context/CaseContext';
+import { safeBack } from '@/utils/navigation';
 
 export default function CreateIncidentScreen() {
+  const { t } = useTranslation();
+  const { createNewCase, addClaimToCase } = useCaseState();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [initialClaim, setInitialClaim] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [createdNotice, setCreatedNotice] = useState(false);
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const colors = Colors[isDark ? 'dark' : 'light'];
+  const isDark = false;
+  const colors = Colors.light;
 
-  const handleCreate = () => {
-    setCreatedNotice(true);
-    setTimeout(() => {
-      router.back();
-    }, 1200);
+  const handleCreate = async () => {
+    if (!title.trim()) return;
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const created = await createNewCase(title.trim(), description.trim());
+      if (initialClaim.trim()) {
+        await addClaimToCase(created.id, initialClaim.trim(), 'Primary Observation');
+      }
+      setCreatedNotice(true);
+      setTimeout(() => {
+        router.replace(`/incident/${created.id}` as any);
+      }, 1000);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to create record. Please ensure backend is reachable.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -31,48 +51,50 @@ export default function CreateIncidentScreen() {
           showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View style={styles.header}>
-            <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Pressable onPress={() => safeBack('/')} style={styles.backButton}>
               <ThemedText type="smallBold" style={styles.backButtonText}>
-                ← Back to overview
+                ← {t.common.backToOverview}
               </ThemedText>
             </Pressable>
-            <ThemedText type="title">Create incident</ThemedText>
+            <ThemedText type="title">{t.incidentCreate.title}</ThemedText>
             <ThemedText type="default" style={styles.subtitle}>
-              Add a new case to test in this session.
+              Initiate a confidential, cryptographically backed case record. All timeline logs maintain SHA-256 auditability.
             </ThemedText>
           </View>
 
-          {/* 1-Sentence Demo Notice */}
-          <ThemedView type="backgroundElement" style={styles.demoBanner}>
-            <ThemedText type="smallBold" style={styles.demoBannerText}>
-              Sample demo: New cases are saved in memory for this session only.
-            </ThemedText>
-          </ThemedView>
+          {errorMsg ? (
+            <ThemedView type="backgroundElement" style={styles.errorBanner}>
+              <ThemedText type="smallBold" style={styles.errorBannerText}>
+                ⚠ {errorMsg}
+              </ThemedText>
+            </ThemedView>
+          ) : null}
 
           {createdNotice ? (
             <ThemedView type="backgroundElement" style={styles.successBanner}>
               <ThemedText type="smallBold" style={styles.successText}>
-                ✓ Demo incident registered in memory! Returning...
+                ✓ Record successfully initialized and registered in local vault! Navigating...
               </ThemedText>
             </ThemedView>
           ) : (
             <ThemedView type="backgroundElement" style={styles.formCard}>
               <ThemedText type="smallBold" style={styles.fieldLabel}>
-                INCIDENT TITLE
+                INCIDENT RECORD TITLE *
               </ThemedText>
               <TextInput
                 style={[
                   styles.input,
                   { color: colors.text, borderColor: isDark ? BrandColors.borderDark : BrandColors.border },
                 ]}
-                placeholder="e.g. Missing office equipment"
+                placeholder="e.g. Workplace Disciplinary Escalation / Notice"
                 placeholderTextColor={BrandColors.muted}
                 value={title}
                 onChangeText={setTitle}
+                editable={!isSubmitting}
               />
 
               <ThemedText type="smallBold" style={styles.fieldLabel}>
-                INCIDENT DESCRIPTION
+                SUMMARY & CONTEXT NOTE
               </ThemedText>
               <TextInput
                 style={[
@@ -80,24 +102,44 @@ export default function CreateIncidentScreen() {
                   styles.textArea,
                   { color: colors.text, borderColor: isDark ? BrandColors.borderDark : BrandColors.border },
                 ]}
-                placeholder="Write a short summary of the situation..."
+                placeholder="Describe what occurred, dates, parties involved, or key background details..."
                 placeholderTextColor={BrandColors.muted}
                 multiline
-                numberOfLines={4}
+                numberOfLines={3}
                 value={description}
                 onChangeText={setDescription}
+                editable={!isSubmitting}
+              />
+
+              <ThemedText type="smallBold" style={styles.fieldLabel}>
+                INITIAL FACT OR CLAIM (OPTIONAL)
+              </ThemedText>
+              <TextInput
+                style={[
+                  styles.input,
+                  { color: colors.text, borderColor: isDark ? BrandColors.borderDark : BrandColors.border },
+                ]}
+                placeholder="e.g. Received unannounced termination notice without prior PIP"
+                placeholderTextColor={BrandColors.muted}
+                value={initialClaim}
+                onChangeText={setInitialClaim}
+                editable={!isSubmitting}
               />
 
               <Pressable
                 style={[
                   styles.submitButton,
-                  !title && styles.submitButtonDisabled,
+                  (!title.trim() || isSubmitting) && styles.submitButtonDisabled,
                 ]}
-                disabled={!title}
+                disabled={!title.trim() || isSubmitting}
                 onPress={handleCreate}>
-                <ThemedText type="smallBold" style={styles.submitButtonText}>
-                  Save incident →
-                </ThemedText>
+                {isSubmitting ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <ThemedText type="smallBold" style={styles.submitButtonText}>
+                    Initialize Cryptographic Record →
+                  </ThemedText>
+                )}
               </Pressable>
             </ThemedView>
           )}
@@ -205,6 +247,17 @@ const styles = StyleSheet.create({
   },
   successText: {
     color: '#059669',
+    fontSize: 14,
+  },
+  errorBanner: {
+    padding: Spacing.four,
+    borderRadius: Spacing.three,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  errorBannerText: {
+    color: '#DC2626',
     fontSize: 14,
   },
 });

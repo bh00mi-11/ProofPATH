@@ -1,42 +1,51 @@
 import React from 'react';
-import { StyleSheet, ScrollView, View, Pressable } from 'react-native';
+import { StyleSheet, ScrollView, View, Pressable, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, BrandColors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BrandColors, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useCaseState } from '@/context/CaseContext';
 import { RecipientType } from '@/types/proofpath.types';
 import { ALL_DISCLOSURE_FIELDS } from '@/services/case-service';
 import { FieldCheckboxList } from '@/components/proofpath';
+import { useTranslation } from '@/context/LanguageContext';
 
-const RECIPIENTS: { type: RecipientType; label: string; description: string }[] = [
+const RECIPIENTS: { type: RecipientType; label: string; description: string; icon: string }[] = [
   {
     type: 'TRUSTED_CONTACT',
     label: 'Trusted Contact',
-    description: 'Personal advocate, close friend, or family member.',
+    description: 'Personal advocate, close friend, or family member. Sensitive technical identifiers are redacted.',
+    icon: '🤝',
   },
   {
     type: 'SUPPORT_ORGANIZATION',
     label: 'Support Organization',
-    description: 'Crisis counselor, advisor, or social support team.',
+    description: 'Crisis counselor, NGO, or advisory team. Focused on incident context and personal safety needs.',
+    icon: '🏢',
   },
   {
     type: 'LEGAL_PROFESSIONAL',
     label: 'Legal Professional',
-    description: 'Attorney or legal advisor requiring full case facts.',
+    description: 'Attorney or legal representative requiring complete case facts and chain-of-custody metadata.',
+    icon: '⚖',
   },
 ];
 
 export default function PrivacyScreen() {
+  const { t } = useTranslation();
   const {
+    currentCase,
     selectedRecipient,
     includedDisclosureFields,
     disclosurePreview,
     setSelectedRecipient,
     toggleDisclosureField,
   } = useCaseState();
+
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 1024;
 
   const totalFields = ALL_DISCLOSURE_FIELDS.length;
   const includedCount = includedDisclosureFields.length;
@@ -47,32 +56,70 @@ export default function PrivacyScreen() {
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
+          contentContainerStyle={[
+            styles.scrollContent,
+            isDesktop && styles.desktopScrollContent,
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <View style={styles.header}>
-            <ThemedText type="title">Choose what to share</ThemedText>
+            <View style={styles.badgeRow}>
+              <View style={styles.workspacePill}>
+                <ThemedText style={styles.workspacePillText}>SHARE SAFELY WORKSPACE</ThemedText>
+              </View>
+              <ThemedText type="small" style={styles.caseBadge}>
+                {currentCase?.title || 'Case Disclosure'}
+              </ThemedText>
+            </View>
+            <ThemedText type="title">{t.privacy.title}</ThemedText>
             <ThemedText type="default" style={styles.subtitle}>
-              Pick who receives the report and decide which details to include or hide.
+              {t.privacy.subtitle}
             </ThemedText>
           </View>
 
-          {/* 1-Sentence Demo Notice */}
-          <ThemedView type="backgroundElement" style={styles.demoBanner}>
-            <ThemedText type="smallBold" style={styles.demoBannerText}>
-              Sample demo: This preview does not perform legal redaction or send real documents.
+          {/* Workflow Stepper Bar */}
+          <View style={styles.stepperBar}>
+            <View style={[styles.stepItem, styles.stepItemActive]}>
+              <ThemedText style={styles.stepNumActive}>1</ThemedText>
+              <ThemedText style={styles.stepLabelActive}>Select Recipient</ThemedText>
+            </View>
+            <ThemedText style={styles.stepDivider}>→</ThemedText>
+            <View style={[styles.stepItem, styles.stepItemActive]}>
+              <ThemedText style={styles.stepNumActive}>2</ThemedText>
+              <ThemedText style={styles.stepLabelActive}>Review Fields</ThemedText>
+            </View>
+            <ThemedText style={styles.stepDivider}>→</ThemedText>
+            <Pressable
+              style={styles.stepItem}
+              onPress={() => router.push('/report/preview')}
+            >
+              <ThemedText style={styles.stepNumInactive}>3</ThemedText>
+              <ThemedText style={styles.stepLabelInactive}>Preview & Export</ThemedText>
+            </Pressable>
+          </View>
+
+          {/* Transparent Notice Banner */}
+          <ThemedView type="backgroundElement" style={styles.noticeBanner}>
+            <ThemedText type="smallBold" style={styles.noticeBannerTitle}>
+              🛡 ZERO SILENT LEAKAGE GUARANTEE
+            </ThemedText>
+            <ThemedText type="small" style={styles.noticeBannerText}>
+              ProofPath strictly validates all disclosure profiles against server-side allowlists. Deselected fields are permanently excised before PDF compilation, ensuring confidential data is never transmitted.
             </ThemedText>
           </ThemedView>
 
           {/* Recipient Audience Selector */}
-          <ThemedText type="smallBold" style={styles.sectionHeader}>
-            1. WHO WILL RECEIVE THIS REPORT?
-          </ThemedText>
-          <ThemedText type="small" style={styles.sectionHint}>
-            Select the recipient to automatically apply recommended defaults:
-          </ThemedText>
+          <View style={styles.sectionHeaderRow}>
+            <ThemedText type="smallBold" style={styles.sectionHeader}>
+              1. CHOOSE YOUR INTENDED RECIPIENT
+            </ThemedText>
+            <ThemedText type="small" style={styles.sectionSub}>
+              Applies tested baseline redactions tailored for each audience
+            </ThemedText>
+          </View>
 
-          <View style={styles.recipientGroup}>
+          <View style={styles.recipientGrid}>
             {RECIPIENTS.map((rec) => {
               const isSelected = selectedRecipient === rec.type;
               return (
@@ -82,28 +129,23 @@ export default function PrivacyScreen() {
                     styles.recipientCard,
                     isSelected && styles.recipientCardActive,
                   ]}
-                  onPress={() => setSelectedRecipient(rec.type)}>
-                  <View style={styles.recipientHeader}>
-                    <ThemedText
-                      type="smallBold"
-                      style={isSelected ? styles.textActive : undefined}>
-                      {rec.label}
-                    </ThemedText>
+                  onPress={() => setSelectedRecipient(rec.type)}
+                >
+                  <View style={styles.recipientTop}>
+                    <ThemedText style={styles.recipientIcon}>{rec.icon}</ThemedText>
                     <View
                       style={[
-                        styles.recipientPill,
-                        isSelected ? styles.recipientPillActive : styles.recipientPillInactive,
-                      ]}>
-                      <ThemedText
-                        type="smallBold"
-                        style={isSelected ? styles.badgeActive : styles.badgeInactive}>
-                        {isSelected ? '✓ Selected' : 'Select'}
-                      </ThemedText>
+                        styles.recipientRadio,
+                        isSelected && styles.recipientRadioSelected,
+                      ]}
+                    >
+                      {isSelected ? <View style={styles.radioInner} /> : null}
                     </View>
                   </View>
-                  <ThemedText
-                    type="small"
-                    style={[styles.dimText, isSelected && styles.dimTextActive]}>
+                  <ThemedText type="subtitle" style={styles.recipientTitle}>
+                    {rec.label}
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.recipientDesc}>
                     {rec.description}
                   </ThemedText>
                 </Pressable>
@@ -111,66 +153,39 @@ export default function PrivacyScreen() {
             })}
           </View>
 
-          {/* Included / Excluded Fields via FieldCheckboxList */}
-          <View style={styles.fieldSectionHeader}>
+          {/* Field Redaction Checklist */}
+          <View style={styles.sectionHeaderRow}>
             <ThemedText type="smallBold" style={styles.sectionHeader}>
-              2. CHOOSE WHICH FIELDS TO SHOW
+              2. TAILOR DISCLOSURE FIELDS ({includedCount} INCLUDED, {redactedCount} REDACTED)
             </ThemedText>
-            <ThemedText type="small" style={styles.tallyText}>
-              {includedCount} shown · {redactedCount} hidden
+            <ThemedText type="small" style={styles.sectionSub}>
+              Toggle individual data points on or off with live state sync
             </ThemedText>
           </View>
-          <ThemedText type="small" style={styles.sectionHint}>
-            Tap any field to include or hide it in the sample report:
-          </ThemedText>
 
-          <FieldCheckboxList
-            fields={ALL_DISCLOSURE_FIELDS}
-            includedFields={includedDisclosureFields}
-            onToggleField={toggleDisclosureField}
-          />
+          <ThemedView type="backgroundElement" style={styles.fieldsCard}>
+            <FieldCheckboxList
+              fields={ALL_DISCLOSURE_FIELDS}
+              includedFields={includedDisclosureFields}
+              onToggleField={toggleDisclosureField}
+            />
+          </ThemedView>
 
-          {/* Illustrative Mock Policy Warnings Box */}
-          <ThemedText type="smallBold" style={styles.sectionHeader}>
-            3. SAMPLE POLICY CHECKS ({disclosurePreview?.warnings.length ?? 0})
-          </ThemedText>
-          <ThemedText type="small" style={styles.sectionHint}>
-            Automated warnings based on your recipient and field choices:
-          </ThemedText>
-
-          {disclosurePreview?.warnings.length === 0 ? (
-            <ThemedView type="backgroundElement" style={styles.emptyCard}>
-              <ThemedText type="small" style={styles.emptyNoticeText}>
-                ✓ All checks passed for this recipient and field selection.
+          {/* Next Step Action CTA */}
+          <ThemedView type="backgroundElement" style={styles.ctaCard}>
+            <View style={styles.ctaTextCol}>
+              <ThemedText type="subtitle" style={styles.ctaTitle}>
+                Ready to review privacy redactions?
               </ThemedText>
-            </ThemedView>
-          ) : (
-            disclosurePreview?.warnings.map((warn, idx) => (
-              <ThemedView key={idx} type="backgroundElement" style={styles.warningCard}>
-                <ThemedText type="small" style={styles.warningLabel}>
-                  ⚠ {warn}
-                </ThemedText>
-              </ThemedView>
-            ))
-          )}
-
-          {/* Obvious Next Action: Action Link to Sample Report Preview */}
-          <ThemedView type="backgroundElement" style={styles.nextActionCard}>
-            <ThemedText type="smallBold" style={styles.nextActionTag}>
-              NEXT ACTION
-            </ThemedText>
-            <ThemedText type="subtitle" style={styles.nextActionTitle}>
-              Preview your sample report
-            </ThemedText>
-            <ThemedText type="small" style={styles.nextActionDesc}>
-              See how the document looks for a {selectedRecipient.toLowerCase().replace('_', ' ')}.
-            </ThemedText>
+              <ThemedText type="small" style={styles.ctaDesc}>
+                Preview the generated incident report layout before confirming and exporting.
+              </ThemedText>
+            </View>
             <Pressable
-              style={styles.previewReportButton}
-              onPress={() => router.push('/report/preview')}>
-              <ThemedText type="smallBold" style={styles.previewButtonText}>
-                Preview sample report →
-              </ThemedText>
+              style={styles.previewBtn}
+              onPress={() => router.push('/report/preview')}
+            >
+              <ThemedText style={styles.previewBtnText}>Preview Incident Report →</ThemedText>
             </Pressable>
           </ThemedView>
         </ScrollView>
@@ -182,10 +197,10 @@ export default function PrivacyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Colors.light.background,
   },
   safeArea: {
     flex: 1,
-    alignItems: 'center',
   },
   scroll: {
     width: '100%',
@@ -194,176 +209,215 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.six,
-    gap: Spacing.three,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 48,
+    gap: 16,
+  },
+  desktopScrollContent: {
+    paddingHorizontal: 32,
+    paddingTop: 24,
+    maxWidth: 1080,
   },
   header: {
-    marginBottom: Spacing.one,
+    gap: 6,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 2,
+  },
+  workspacePill: {
+    backgroundColor: BrandColors.roseLight,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 100,
+  },
+  workspacePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: BrandColors.rose,
+    letterSpacing: 0.5,
+  },
+  caseBadge: {
+    color: Colors.light.textSecondary,
   },
   subtitle: {
-    opacity: 0.75,
-    marginTop: Spacing.half,
+    color: Colors.light.textSecondary,
     lineHeight: 20,
-    fontSize: 14,
   },
-  demoBanner: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    backgroundColor: BrandColors.indigoLight,
+  stepperBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.light.backgroundSubtle,
+    borderRadius: 10,
+    padding: 10,
     borderWidth: 1,
-    borderColor: '#C7D2FE',
+    borderColor: Colors.light.border,
+    gap: 8,
+    flexWrap: 'wrap',
   },
-  demoBannerText: {
+  stepItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stepItemActive: {
+    opacity: 1,
+  },
+  stepNumActive: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: BrandColors.indigo,
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  stepLabelActive: {
+    fontSize: 12,
+    fontWeight: '600',
     color: BrandColors.indigo,
-    fontSize: 13,
+  },
+  stepDivider: {
+    color: Colors.light.textMuted,
+    fontSize: 12,
+  },
+  stepNumInactive: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Colors.light.border,
+    color: Colors.light.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  stepLabelInactive: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+  },
+  noticeBanner: {
+    backgroundColor: BrandColors.roseLight,
+    borderWidth: 1,
+    borderColor: BrandColors.roseBorder,
+    borderRadius: 12,
+    padding: 14,
+    gap: 4,
+  },
+  noticeBannerTitle: {
+    color: BrandColors.rose,
+    letterSpacing: 0.5,
+  },
+  noticeBannerText: {
+    color: '#881337',
     lineHeight: 18,
+  },
+  sectionHeaderRow: {
+    marginTop: 6,
+    gap: 2,
   },
   sectionHeader: {
-    opacity: 0.7,
-    marginTop: Spacing.two,
+    color: Colors.light.textSecondary,
     fontSize: 12,
     letterSpacing: 0.5,
   },
-  sectionHint: {
-    opacity: 0.65,
+  sectionSub: {
+    color: Colors.light.textMuted,
     fontSize: 12,
-    marginTop: -Spacing.one,
-    lineHeight: 16,
   },
-  recipientGroup: {
-    gap: Spacing.two,
+  recipientGrid: {
+    gap: 12,
   },
   recipientCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    borderWidth: 1,
-    borderColor: BrandColors.border,
-    gap: 4,
     backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    padding: 16,
+    gap: 8,
   },
   recipientCardActive: {
+    borderColor: BrandColors.indigo,
     backgroundColor: BrandColors.indigoLight,
-    borderColor: BrandColors.indigo,
   },
-  recipientHeader: {
+  recipientTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  recipientPill: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 2,
-    borderRadius: Spacing.one,
-    borderWidth: 1,
+  recipientIcon: {
+    fontSize: 22,
   },
-  recipientPillActive: {
-    backgroundColor: '#FFFFFF',
+  recipientRadio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: Colors.light.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recipientRadioSelected: {
     borderColor: BrandColors.indigo,
   },
-  recipientPillInactive: {
-    backgroundColor: 'transparent',
-    borderColor: BrandColors.border,
-  },
-  textActive: {
-    color: BrandColors.indigo,
-    fontWeight: '700',
-  },
-  badgeActive: {
-    color: BrandColors.indigo,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  badgeInactive: {
-    color: BrandColors.muted,
-    fontSize: 11,
-  },
-  dimText: {
-    opacity: 0.65,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  dimTextActive: {
-    opacity: 0.9,
-    color: BrandColors.indigo,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  fieldSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: Spacing.two,
-    flexWrap: 'wrap',
-    gap: Spacing.one,
-  },
-  tallyText: {
-    fontSize: 12,
-    color: BrandColors.indigo,
-    fontWeight: '600',
-  },
-  emptyCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    backgroundColor: '#ECFDF5',
-  },
-  emptyNoticeText: {
-    color: '#059669',
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  warningCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    borderLeftWidth: 4,
-    borderLeftColor: '#D97706',
-    borderWidth: 1,
-    borderColor: BrandColors.border,
-    backgroundColor: '#FFFBEB',
-  },
-  warningLabel: {
-    color: '#D97706',
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '500',
-  },
-  nextActionCard: {
-    padding: Spacing.four,
-    borderRadius: Spacing.three,
-    borderWidth: 1,
-    borderColor: BrandColors.border,
-    gap: Spacing.one,
-    marginTop: Spacing.two,
-  },
-  nextActionTag: {
-    fontSize: 11,
-    color: BrandColors.indigo,
-    letterSpacing: 0.5,
-  },
-  nextActionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  nextActionDesc: {
-    fontSize: 13,
-    opacity: 0.75,
-    lineHeight: 18,
-  },
-  previewReportButton: {
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: BrandColors.indigo,
-    paddingVertical: 12,
-    paddingHorizontal: Spacing.four,
-    borderRadius: Spacing.two,
-    alignItems: 'center',
-    marginTop: Spacing.one,
   },
-  previewButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
+  recipientTitle: {
+    fontSize: 16,
+    color: Colors.light.text,
+  },
+  recipientDesc: {
+    color: Colors.light.textSecondary,
+    lineHeight: 18,
+  },
+  fieldsCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    padding: 16,
+  },
+  ctaCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BrandColors.indigoBorder,
+    backgroundColor: BrandColors.indigoLight,
+    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 14,
+    flexWrap: 'wrap',
+  },
+  ctaTextCol: {
+    flex: 1,
+    minWidth: 220,
+    gap: 4,
+  },
+  ctaTitle: {
+    fontSize: 16,
+    color: Colors.light.text,
+  },
+  ctaDesc: {
+    color: Colors.light.textSecondary,
+  },
+  previewBtn: {
+    backgroundColor: BrandColors.indigo,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  previewBtnText: {
+    color: '#FFFFFF',
     fontWeight: '600',
+    fontSize: 13,
   },
 });

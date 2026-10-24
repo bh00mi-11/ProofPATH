@@ -15,19 +15,19 @@ const INTEGRITY_CONFIG: Record<
   { label: string; bg: string; border: string; text: string }
 > = {
   MATCH: {
-    label: '✓ Check: Match',
+    label: '✓ SHA-256 match',
     bg: '#ECFDF5',
     border: '#A7F3D0',
     text: '#059669',
   },
   MISMATCH: {
-    label: '✕ Check: Mismatch',
+    label: '✕ SHA-256 mismatch',
     bg: '#FEF2F2',
     border: '#FECACA',
     text: '#DC2626',
   },
   NOT_CHECKED: {
-    label: '○ Check: Not checked',
+    label: '○ SHA-256 not checked',
     bg: '#F1F5F9',
     border: '#CBD5E1',
     text: '#475569',
@@ -55,12 +55,12 @@ export function IntegrityBadge({
       </View>
 
       <ThemedText type="small" style={styles.disclaimerText}>
-        Example check only
+        SHA-256 integrity check
       </ThemedText>
 
       {showFullNotice && (
         <ThemedText type="small" style={styles.fullNotice}>
-          This is a sample check for this demo, not a certified legal test.
+          Deterministic file digest comparison. Does not certify historical truth or legal admissibility.
         </ThemedText>
       )}
     </View>

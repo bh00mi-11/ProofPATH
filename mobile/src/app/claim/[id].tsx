@@ -1,17 +1,22 @@
 import React from 'react';
-import { StyleSheet, ScrollView, View, Pressable } from 'react-native';
+import { StyleSheet, ScrollView, View, Pressable, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, BrandColors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BrandColors, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useCaseState } from '@/context/CaseContext';
 import { ClaimStatusBadge } from '@/components/proofpath';
+import { useTranslation } from '@/context/LanguageContext';
+import { safeBack } from '@/utils/navigation';
 
 export default function ClaimDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { claims, observations } = useCaseState();
+  const { claims, observations, evidence } = useCaseState();
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 1024;
 
   const claim = claims.find((c) => c.id === id) ?? claims[0];
 
@@ -28,33 +33,38 @@ export default function ClaimDetailScreen() {
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
+          contentContainerStyle={[
+            styles.scrollContent,
+            isDesktop && styles.desktopScrollContent,
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <View style={styles.header}>
-            <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <Pressable onPress={() => safeBack('/evidence')} style={styles.backButton}>
               <ThemedText type="smallBold" style={styles.backButtonText}>
-                ← Back
+                ← {t.common.back}
               </ThemedText>
             </Pressable>
-            <ThemedText type="title">Claim details</ThemedText>
+            <View style={styles.badgeRow}>
+              <View style={styles.workspacePill}>
+                <ThemedText style={styles.workspacePillText}>TRACE ENGINE AUDIT</ThemedText>
+              </View>
+              <ThemedText type="small" style={styles.claimIdTag}>
+                Claim ID: {claim?.id || 'N/A'}
+              </ThemedText>
+            </View>
+            <ThemedText type="title">{t.claimDetail.title}</ThemedText>
             <ThemedText type="default" style={styles.subtitle}>
-              Comparing facts that support or conflict with this claim.
+              Deterministic Trace Engine justification, supporting observations, and identified contradictions.
             </ThemedText>
           </View>
-
-          {/* 1-Sentence Demo Notice */}
-          <ThemedView type="backgroundElement" style={styles.demoBanner}>
-            <ThemedText type="smallBold" style={styles.demoBannerText}>
-              Sample demo: Claim evaluations and linked facts are fictional examples.
-            </ThemedText>
-          </ThemedView>
 
           {/* Statement & Status Card */}
           <ThemedView type="backgroundElement" style={styles.card}>
             <View style={styles.statusRow}>
               <ThemedText type="smallBold" style={styles.statusTitle}>
-                CURRENT STATUS
+                {t.claimDetail.currentStatus}
               </ThemedText>
               {claim && <ClaimStatusBadge status={claim.status} />}
             </View>
@@ -63,67 +73,107 @@ export default function ClaimDetailScreen() {
               "{claim?.text}"
             </ThemedText>
 
-            <ThemedText type="smallBold" style={styles.fieldHeader}>
-              WHY THIS STATUS WAS ASSIGNED
-            </ThemedText>
-            <ThemedText type="default" style={styles.explanationText}>
-              {claim?.explanation}
-            </ThemedText>
+            <View style={styles.reasonBox}>
+              <ThemedText type="tag" style={styles.reasonTag}>
+                DETERMINISTIC EVALUATION REASON
+              </ThemedText>
+              <ThemedText type="default" style={styles.explanationText}>
+                {claim?.explanation || 'No deterministic rationale assigned.'}
+              </ThemedText>
+            </View>
+
+            <View style={styles.evalNotice}>
+              <ThemedText type="small" style={styles.evalNoticeText}>
+                ℹ️ Status reflects internal evidence matching in ProofPath. It does not constitute a judicial conclusion or police finding.
+              </ThemedText>
+            </View>
           </ThemedView>
 
           {/* Supporting Observations */}
-          <ThemedText type="smallBold" style={styles.sectionHeader}>
-            FACTS THAT SUPPORT THIS CLAIM ({supportingObservations.length})
-          </ThemedText>
+          <View style={styles.sectionHeaderRow}>
+            <ThemedText type="smallBold" style={styles.sectionHeader}>
+              SUPPORTING OBSERVATIONS ({supportingObservations.length})
+            </ThemedText>
+          </View>
 
           {supportingObservations.length === 0 ? (
             <ThemedView type="backgroundElement" style={styles.emptyCard}>
               <ThemedText type="small" style={styles.dimText}>
-                No supporting facts linked to this claim.
+                No supporting factual observations currently linked to this claim.
               </ThemedText>
             </ThemedView>
           ) : (
-            supportingObservations.map((obs) => (
-              <ThemedView key={obs.id} type="backgroundElement" style={styles.obsCardSupport}>
-                <View style={styles.obsHeader}>
-                  <ThemedText type="smallBold" style={styles.factSupportId}>
-                    ✓ Fact #{obs.id}
+            supportingObservations.map((obs) => {
+              const srcArtifact = evidence.find((e) => e.id === obs.evidenceId);
+              return (
+                <ThemedView key={obs.id} type="backgroundElement" style={styles.obsCardSupport}>
+                  <View style={styles.obsHeader}>
+                    <View style={styles.factBadgeSupport}>
+                      <ThemedText type="smallBold" style={styles.factSupportId}>
+                        ✓ Observation #{obs.id}
+                      </ThemedText>
+                    </View>
+                    <ThemedText type="small" style={styles.dimText}>
+                      Source: {srcArtifact?.name || obs.evidenceId}
+                    </ThemedText>
+                  </View>
+                  <ThemedText type="default" style={styles.obsText}>
+                    "{obs.text}"
                   </ThemedText>
-                  <ThemedText type="small" style={styles.dimText}>
-                    From Evidence item: {obs.evidenceId}
+                  <ThemedText type="small" style={styles.obsMeta}>
+                    Logged at {new Date(obs.recordedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                   </ThemedText>
-                </View>
-                <ThemedText type="default" style={styles.obsText}>"{obs.text}"</ThemedText>
-              </ThemedView>
-            ))
+                </ThemedView>
+              );
+            })
           )}
 
           {/* Conflicting Observations */}
-          <ThemedText type="smallBold" style={styles.sectionHeader}>
-            FACTS THAT CONFLICT WITH THIS CLAIM ({conflictingObservations.length})
-          </ThemedText>
+          <View style={styles.sectionHeaderRow}>
+            <ThemedText type="smallBold" style={styles.sectionHeaderConflict}>
+              CONFLICTING OBSERVATIONS ({conflictingObservations.length})
+            </ThemedText>
+          </View>
 
           {conflictingObservations.length === 0 ? (
             <ThemedView type="backgroundElement" style={styles.emptyCard}>
               <ThemedText type="small" style={styles.dimText}>
-                No conflicting facts linked to this claim.
+                No direct contradictory observations detected in the timeline.
               </ThemedText>
             </ThemedView>
           ) : (
-            conflictingObservations.map((obs) => (
-              <ThemedView key={obs.id} type="backgroundElement" style={styles.obsCardConflict}>
-                <View style={styles.obsHeader}>
-                  <ThemedText type="smallBold" style={styles.factConflictId}>
-                    ✕ Fact #{obs.id}
+            conflictingObservations.map((obs) => {
+              const srcArtifact = evidence.find((e) => e.id === obs.evidenceId);
+              return (
+                <ThemedView key={obs.id} type="backgroundElement" style={styles.obsCardConflict}>
+                  <View style={styles.obsHeader}>
+                    <View style={styles.factBadgeConflict}>
+                      <ThemedText type="smallBold" style={styles.factConflictId}>
+                        ✕ Contradiction #{obs.id}
+                      </ThemedText>
+                    </View>
+                    <ThemedText type="small" style={styles.dimText}>
+                      Source: {srcArtifact?.name || obs.evidenceId}
+                    </ThemedText>
+                  </View>
+                  <ThemedText type="default" style={styles.obsText}>
+                    "{obs.text}"
                   </ThemedText>
-                  <ThemedText type="small" style={styles.dimText}>
-                    From Evidence item: {obs.evidenceId}
+                  <ThemedText type="small" style={styles.obsMeta}>
+                    Logged at {new Date(obs.recordedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                   </ThemedText>
-                </View>
-                <ThemedText type="default" style={styles.obsText}>"{obs.text}"</ThemedText>
-              </ThemedView>
-            ))
+                </ThemedView>
+              );
+            })
           )}
+
+          {/* Quick Return Action */}
+          <Pressable
+            style={styles.returnBtn}
+            onPress={() => router.push('/evidence')}
+          >
+            <ThemedText style={styles.returnBtnText}>← Return to Evidence Repository</ThemedText>
+          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -133,10 +183,10 @@ export default function ClaimDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Colors.light.background,
   },
   safeArea: {
     flex: 1,
-    alignItems: 'center',
   },
   scroll: {
     width: '100%',
@@ -145,130 +195,196 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.six,
-    gap: Spacing.three,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 48,
+    gap: 16,
+  },
+  desktopScrollContent: {
+    paddingHorizontal: 32,
+    paddingTop: 24,
+    maxWidth: 960,
   },
   header: {
-    marginBottom: Spacing.one,
+    gap: 6,
   },
   backButton: {
-    marginBottom: Spacing.one,
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+    marginBottom: 4,
   },
   backButtonText: {
     color: BrandColors.indigo,
-    fontSize: 13,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 2,
+  },
+  workspacePill: {
+    backgroundColor: BrandColors.indigoLight,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 100,
+  },
+  workspacePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: BrandColors.indigo,
+    letterSpacing: 0.5,
+  },
+  claimIdTag: {
+    color: Colors.light.textSecondary,
   },
   subtitle: {
-    opacity: 0.75,
-    marginTop: Spacing.half,
+    color: Colors.light.textSecondary,
     lineHeight: 20,
-    fontSize: 14,
-  },
-  demoBanner: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    backgroundColor: BrandColors.indigoLight,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-  },
-  demoBannerText: {
-    color: BrandColors.indigo,
-    fontSize: 13,
-    lineHeight: 18,
   },
   card: {
-    padding: Spacing.four,
-    borderRadius: Spacing.three,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: BrandColors.border,
-    backgroundColor: '#FFFFFF',
-    gap: Spacing.two,
+    borderColor: Colors.light.border,
+    padding: 20,
+    gap: 14,
   },
   statusRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: Spacing.one,
+    gap: 8,
   },
   statusTitle: {
-    fontSize: 12,
-    color: BrandColors.muted,
-    letterSpacing: 0.5,
+    fontSize: 13,
+    color: Colors.light.textSecondary,
   },
   claimText: {
-    fontSize: 17,
-    fontWeight: '600',
-    lineHeight: 24,
-    marginTop: Spacing.half,
+    fontSize: 18,
+    lineHeight: 26,
+    color: Colors.light.text,
   },
-  fieldHeader: {
-    marginTop: Spacing.one,
-    fontSize: 12,
-    color: BrandColors.muted,
-    letterSpacing: 0.5,
+  reasonBox: {
+    backgroundColor: Colors.light.backgroundSubtle,
+    borderRadius: 10,
+    padding: 14,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  reasonTag: {
+    color: BrandColors.indigo,
   },
   explanationText: {
-    opacity: 0.85,
     fontSize: 14,
     lineHeight: 20,
+    color: Colors.light.text,
+  },
+  evalNotice: {
+    backgroundColor: BrandColors.tealLight,
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: BrandColors.tealBorder,
+  },
+  evalNoticeText: {
+    color: '#0F766E',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  sectionHeaderRow: {
+    marginTop: 4,
   },
   sectionHeader: {
-    marginTop: Spacing.two,
-    opacity: 0.7,
+    color: BrandColors.success,
     fontSize: 12,
     letterSpacing: 0.5,
   },
-  emptyCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    borderWidth: 1,
-    borderColor: BrandColors.border,
-    backgroundColor: '#FFFFFF',
+  sectionHeaderConflict: {
+    color: BrandColors.danger,
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
   obsCardSupport: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    borderLeftWidth: 4,
-    borderLeftColor: '#059669',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: BrandColors.border,
+    borderColor: BrandColors.successBorder,
     backgroundColor: '#FFFFFF',
-    gap: Spacing.one,
-  },
-  factSupportId: {
-    color: '#059669',
-    fontSize: 12,
+    padding: 16,
+    gap: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: BrandColors.success,
   },
   obsCardConflict: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    borderLeftWidth: 4,
-    borderLeftColor: '#DC2626',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: BrandColors.border,
+    borderColor: BrandColors.dangerBorder,
     backgroundColor: '#FFFFFF',
-    gap: Spacing.one,
-  },
-  factConflictId: {
-    color: '#DC2626',
-    fontSize: 12,
+    padding: 16,
+    gap: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: BrandColors.danger,
   },
   obsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: Spacing.one,
+    gap: 8,
   },
-  obsText: {
-    fontSize: 13,
-    lineHeight: 18,
+  factBadgeSupport: {
+    backgroundColor: BrandColors.successLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  factSupportId: {
+    fontSize: 11,
+    color: BrandColors.success,
+  },
+  factBadgeConflict: {
+    backgroundColor: BrandColors.dangerLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  factConflictId: {
+    fontSize: 11,
+    color: BrandColors.danger,
   },
   dimText: {
-    opacity: 0.65,
+    color: Colors.light.textSecondary,
     fontSize: 12,
+  },
+  obsText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: Colors.light.text,
+  },
+  obsMeta: {
+    color: Colors.light.textMuted,
+    fontSize: 11,
+  },
+  emptyCard: {
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    alignItems: 'center',
+  },
+  returnBtn: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.light.backgroundSubtle,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  returnBtnText: {
+    color: Colors.light.text,
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

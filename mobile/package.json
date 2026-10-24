@@ -7,9 +7,11 @@
     "expo": "~58.0.19",
     "expo-constants": "~58.0.13",
     "expo-device": "~58.0.5",
+    "expo-document-picker": "~58.0.4",
     "expo-font": "~58.0.10",
     "expo-glass-effect": "~58.0.5",
     "expo-image": "~58.0.17",
+    "expo-image-picker": "~58.0.10",
     "expo-linking": "~58.0.14",
     "expo-router": "~58.0.26",
     "expo-splash-screen": "~58.0.11",
@@ -25,18 +27,22 @@
     "react-native-safe-area-context": "~5.10.1",
     "react-native-screens": "~4.30.0",
     "react-native-web": "~0.21.4",
-    "react-native-worklets": "0.13.0"
+    "react-native-worklets": "0.13.0",
+    "warning": "^4.0.3"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~58.0.4",
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
+    "start": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
+    "android": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --android",
+    "ios": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --ios",
+    "web": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --web",
     "lint": "expo lint"
   },
   "private": true

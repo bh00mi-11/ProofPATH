@@ -47,6 +47,7 @@ RECIPIENT_FIELD_ALLOWLISTS: Dict[str, Set[str]] = {
         "claim_text",
         "verification_state",
         "summary_note"
+        # Accountability entries: excluded by default, but if user explicitly includes, only high-level status & action type permitted (no reference numbers or personal identifiers)
     },
     RecipientType.SUPPORT_ORGANIZATION.value: {
         "case_title",
@@ -55,7 +56,9 @@ RECIPIENT_FIELD_ALLOWLISTS: Dict[str, Set[str]] = {
         "claim_text",
         "verification_state",
         "summary_note",
-        "observation_type_count"
+        "observation_type_count",
+        "accountability_status",
+        "accountability_action_type"
     },
     RecipientType.LEGAL_PROFESSIONAL.value: {
         "case_title",
@@ -68,23 +71,31 @@ RECIPIENT_FIELD_ALLOWLISTS: Dict[str, Set[str]] = {
         "summary_note",
         "observation_details",
         "evidence_sha256",
-        "relation"
+        "relation",
+        "accountability_status",
+        "accountability_action_type",
+        "accountability_reference_number",
+        "accountability_organization",
+        "accountability_provenance"
     }
 }
 
 RECIPIENT_WARNINGS: Dict[str, List[str]] = {
     RecipientType.TRUSTED_CONTACT.value: [
         "Sensitive forensic identifiers, exact timestamps, and artifact SHA-256 hashes are omitted for personal privacy.",
+        "Accountability trail reference numbers and external agency IDs are withheld.",
         "Raw evidence media attachments are excluded.",
         "Notice: This report facilitates emotional/personal support and is not formatted for evidentiary submission."
     ],
     RecipientType.SUPPORT_ORGANIZATION.value: [
         "Identities, exact hour timestamps, and cryptographic hashes are withheld.",
+        "Accountability trail reference numbers and personal identifiers are withheld.",
         "Raw evidence images are excluded.",
         "Notice: Report is tailored for counseling and advocacy intake."
     ],
     RecipientType.LEGAL_PROFESSIONAL.value: [
         "Full forensic timeline, observation sources, and SHA-256 cryptographic integrity hashes are included.",
+        "Accountability history and document-supported provenance are included if explicitly selected.",
         "Raw image attachments are excluded from the PDF document (available via secure evidence custody export).",
         "Notice: Document constitutes a structured case evidence disclosure for counsel review."
     ]
@@ -96,11 +107,14 @@ def generate_disclosure_preview(
     claims: List[Dict[str, Any]],
     observations: List[Dict[str, Any]],
     artifacts: List[Dict[str, Any]],
-    redacted_terms: Optional[List[str]] = None
+    redacted_terms: Optional[List[str]] = None,
+    include_accountability: bool = False,
+    accountability_entries: Optional[List[Dict[str, Any]]] = None
 ) -> Dict[str, Any]:
     """
     Returns disclosure preview containing included fields, excluded fields,
     applicable recipient warnings, and item count summaries.
+    Accountability trail entries are EXCLUDED by default.
     """
     rec_type = recipient_type.upper()
     if rec_type not in RECIPIENT_FIELD_ALLOWLISTS:
@@ -110,12 +124,16 @@ def generate_disclosure_preview(
     all_possible_fields = RECIPIENT_FIELD_ALLOWLISTS[RecipientType.LEGAL_PROFESSIONAL.value]
     excluded_fields = sorted(list(all_possible_fields - approved_fields))
 
+    acc_count = len(accountability_entries or []) if include_accountability else 0
+
     return {
         "recipient_type": rec_type,
         "approved_fields": sorted(list(approved_fields)),
         "excluded_fields": excluded_fields,
         "warnings": RECIPIENT_WARNINGS.get(rec_type, []),
         "included_claims_count": len(claims),
+        "accountability_included": include_accountability,
+        "included_accountability_count": acc_count,
         "raw_images_excluded": True,
         "redacted_terms_count": len(redacted_terms or []),
         "disclaimer": "Notice: ProofPath provides deterministic integrity and structured disclosure; it does not promise absolute anonymity."
@@ -128,7 +146,9 @@ def compile_disclosure_pdf(
     artifacts: Optional[List[Dict[str, Any]]] = None,
     recipient_type: str = RecipientType.LEGAL_PROFESSIONAL.value,
     redacted_terms: Optional[List[str]] = None,
-    include_unverified: bool = True
+    include_unverified: bool = True,
+    include_accountability: bool = False,
+    accountability_entries: Optional[List[Dict[str, Any]]] = None
 ) -> bytes:
     """
     Compiles a robust, multi-page, recipient-filtered PDF report.
@@ -324,6 +344,50 @@ def compile_disclosure_pdf(
 
     if displayed_count == 0:
         story.append(Paragraph("No claims matching disclosure criteria.", body_style))
+
+    # Optional Accountability Trail Section (Excluded by default; only included upon explicit user consent)
+    if include_accountability and accountability_entries:
+        story.append(Spacer(1, 14))
+        story.append(Paragraph("<b>Accountability Trail (Reporting & Status History):</b>", styles['Heading2']))
+        story.append(Paragraph("<b>Honesty Notice:</b> Events and statuses below are user-reported or document-supported; ProofPath does not independently confirm external legal proceedings.", meta_style))
+        story.append(Spacer(1, 6))
+
+        for acc in accountability_entries:
+            acc_elements = []
+            action_title = sanitize(acc.get("action_type", "").replace("_", " ").title())
+            user_time = sanitize(acc.get("user_event_time", ""))
+            status_val = sanitize(acc.get("status", "NOT_REPORTED"))
+            provenance = acc.get("source_classification", "USER_REPORTED")
+
+            # Status line
+            header_text = f"<b>{action_title}</b> ({user_time}) — Status: <b>{status_val}</b>"
+            acc_elements.append(Paragraph(header_text, claim_header_style))
+
+            # Provenance badge
+            prov_text = f"Source Provenance: <b>{provenance}</b>"
+            if provenance == "DOCUMENT_SUPPORTED" and "evidence_sha256" in approved_fields:
+                art_sha = acc.get("linked_artifact", {}).get("sha256", "") if acc.get("linked_artifact") else ""
+                if art_sha:
+                    prov_text += f" [Attached Doc SHA-256: {art_sha[:16]}...]"
+            acc_elements.append(Paragraph(prov_text, meta_style))
+
+            # Description
+            desc = sanitize(acc.get("description", ""))
+            if desc:
+                acc_elements.append(Paragraph(f"Description: {desc}", body_style))
+
+            # Organization (if in allowlist)
+            if "accountability_organization" in approved_fields and acc.get("organization"):
+                acc_elements.append(Paragraph(f"Recipient / Organization: <b>{sanitize(acc['organization'])}</b>", meta_style))
+
+            # Reference Number (Strictly restricted: ONLY for legal professional with explicit allowlist)
+            if "accountability_reference_number" in approved_fields and acc.get("reference_number"):
+                acc_elements.append(Paragraph(f"Reference / Docket Number: <b>{sanitize(acc['reference_number'])}</b>", meta_style))
+            elif acc.get("reference_number") and "accountability_reference_number" not in approved_fields:
+                acc_elements.append(Paragraph("Reference Number: <i>[Withheld by recipient allowlist]</i>", meta_style))
+
+            acc_elements.append(Spacer(1, 6))
+            story.append(KeepTogether(acc_elements))
 
     story.append(Spacer(1, 16))
     story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#e2e8f0'), spaceAfter=8))

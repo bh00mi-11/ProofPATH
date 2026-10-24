@@ -1,107 +1,560 @@
 import React, { useState, useMemo } from 'react';
-import { StyleSheet, ScrollView, View, Pressable } from 'react-native';
+import {
+  StyleSheet,
+  ScrollView,
+  View,
+  Pressable,
+  TextInput,
+  useWindowDimensions,
+  Platform,
+  Modal,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, BrandColors, MaxContentWidth, Spacing } from '@/constants/theme';
+import { BrandColors, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useCaseState } from '@/context/CaseContext';
 import { EvidenceTimelineCard } from '@/components/proofpath';
-import { router } from 'expo-router';
+import { useTranslation } from '@/context/LanguageContext';
+import { apiCaseService } from '@/services/api-case-service';
+import { ObservationProposal, Evidence, Observation } from '@/types/proofpath.types';
 
 export default function EvidenceScreen() {
-  const { evidence, observations, claims, isLoading } = useCaseState();
+  const { t } = useTranslation();
+  const {
+    currentCase,
+    availableCases,
+    evidence,
+    observations,
+    claims,
+    isLoading,
+    uploadEvidenceToCase,
+    addObservationToCase,
+    linkClaimObservation,
+    selectCase,
+    refreshData,
+  } = useCaseState();
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState<string>('all');
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 1024;
 
-  // Chronological timeline sorting by ingestedAt
+  // Add Evidence modal state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [uploadMode, setUploadMode] = useState<'file' | 'text'>('file');
+  const [textFileName, setTextFileName] = useState('');
+  const [textContent, setTextContent] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+
+  // Review Extracted Facts modal state
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [selectedArtifactForReview, setSelectedArtifactForReview] = useState<Evidence | null>(null);
+  const [isLoadingProposals, setIsLoadingProposals] = useState(false);
+  const [proposals, setProposals] = useState<ObservationProposal[]>([]);
+  const [proposalTargets, setProposalTargets] = useState<{ [index: number]: { claimId: string; relation: 'SUPPORTS' | 'CONTRADICTS' | 'CONTEXT' } }>({});
+  const [proposalError, setProposalError] = useState<string | null>(null);
+  const [proposalSuccess, setProposalSuccess] = useState<string | null>(null);
+
+  // Add Manual Fact modal state
+  const [manualFactModalVisible, setManualFactModalVisible] = useState(false);
+  const [targetArtifactForManual, setTargetArtifactForManual] = useState<Evidence | null>(null);
+  const [manualField, setManualField] = useState('message_content');
+  const [manualValue, setManualValue] = useState('');
+  const [manualClaimId, setManualClaimId] = useState<string>('');
+  const [manualRelation, setManualRelation] = useState<'SUPPORTS' | 'CONTRADICTS' | 'CONTEXT'>('SUPPORTS');
+  const [isSavingManualFact, setIsSavingManualFact] = useState(false);
+  const [manualFactError, setManualFactError] = useState<string | null>(null);
+
+  const caseId = currentCase?.id || 'case_demo_01';
+
+  // Filtered and sorted evidence
+  const filteredEvidence = useMemo(() => {
+    return evidence.filter((item) => {
+      const matchesSearch =
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.sha256 && item.sha256.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesType = selectedType === 'all' || item.type === selectedType;
+      return matchesSearch && matchesType;
+    });
+  }, [evidence, searchQuery, selectedType]);
+
   const sortedEvidence = useMemo(() => {
-    return [...evidence].sort((a, b) => {
+    return [...filteredEvidence].sort((a, b) => {
       const timeA = new Date(a.ingestedAt).getTime();
       const timeB = new Date(b.ingestedAt).getTime();
       return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
     });
-  }, [evidence, sortDirection]);
+  }, [filteredEvidence, sortDirection]);
+
+  // Upload helpers
+  const handlePickDocument = async () => {
+    try {
+      setUploadError(null);
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['text/plain', 'text/csv', 'application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+      });
+
+      if (res.canceled || !res.assets || res.assets.length === 0) {
+        return;
+      }
+
+      const asset = res.assets[0];
+      setIsUploading(true);
+
+      const fileObj = {
+        uri: asset.uri,
+        name: asset.name,
+        type: asset.mimeType || 'application/octet-stream',
+        file: (asset as any).file,
+      };
+
+      const uploaded = await uploadEvidenceToCase(caseId, fileObj);
+      setUploadSuccess(`Successfully uploaded ${uploaded.name} to vault!`);
+      setTimeout(() => {
+        setUploadSuccess(null);
+        setModalVisible(false);
+      }, 1500);
+    } catch (err: any) {
+      const msg = typeof err === 'string' ? err : err?.message || (err?.detail ? JSON.stringify(err.detail) : 'Failed to pick or upload document');
+      setUploadError(msg);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      setUploadError(null);
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setUploadError('Permission to access photos/media is required to upload images.');
+        return;
+      }
+
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.9,
+      });
+
+      if (res.canceled || !res.assets || res.assets.length === 0) {
+        return;
+      }
+
+      const asset = res.assets[0];
+      setIsUploading(true);
+
+      const filename = asset.fileName || `evidence_photo_${Date.now()}.jpg`;
+      const fileObj = {
+        uri: asset.uri,
+        name: filename,
+        type: asset.mimeType || 'image/jpeg',
+        file: (asset as any).file,
+      };
+
+      const uploaded = await uploadEvidenceToCase(caseId, fileObj);
+      setUploadSuccess(`Successfully ingested image ${uploaded.name}!`);
+      setTimeout(() => {
+        setUploadSuccess(null);
+        setModalVisible(false);
+      }, 1500);
+    } catch (err: any) {
+      const msg = typeof err === 'string' ? err : err?.message || (err?.detail ? JSON.stringify(err.detail) : 'Failed to select or upload image');
+      setUploadError(msg);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUploadTextNote = async () => {
+    if (!textContent.trim()) {
+      setUploadError('Please enter some text content to save.');
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      setUploadError(null);
+
+      const cleanTitle = (textFileName.trim() || 'incident_statement')
+        .replace(/\.[^/.]+$/, '')
+        .replace(/[^a-zA-Z0-9_\-]/g, '_');
+      const filename = `${cleanTitle}.txt`;
+
+      let fileObj: any;
+      if (Platform.OS === 'web' && typeof Blob !== 'undefined') {
+        fileObj = new File([textContent], filename, { type: 'text/plain' });
+      } else {
+        // Data URI for React Native fetch / FormData
+        const encodedData = encodeURIComponent(textContent);
+        fileObj = {
+          uri: `data:text/plain;charset=utf-8,${encodedData}`,
+          name: filename,
+          type: 'text/plain',
+        };
+      }
+
+      const uploaded = await uploadEvidenceToCase(caseId, fileObj);
+
+      // Auto-extract first observation from text note
+      try {
+        await addObservationToCase(
+          caseId,
+          'Statement Excerpt',
+          textContent.trim().slice(0, 160),
+          uploaded.id
+        );
+      } catch {
+        // Non-blocking observation attachment
+      }
+
+      setUploadSuccess(`Text file "${filename}" recorded and hashed!`);
+      setTextContent('');
+      setTextFileName('');
+      setTimeout(() => {
+        setUploadSuccess(null);
+        setModalVisible(false);
+      }, 1500);
+    } catch (err: any) {
+      const msg = typeof err === 'string' ? err : err?.message || (err?.detail ? JSON.stringify(err.detail) : 'Failed to upload text file');
+      setUploadError(msg);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Review Facts Workflow
+  const handleOpenReviewFacts = async (art: Evidence) => {
+    setSelectedArtifactForReview(art);
+    setProposals([]);
+    setProposalTargets({});
+    setProposalError(null);
+    setProposalSuccess(null);
+    setReviewModalVisible(true);
+    setIsLoadingProposals(true);
+
+    const targetCaseId = art.caseId || caseId;
+
+    try {
+      const res = await apiCaseService.proposeObservations(art.id, targetCaseId);
+      const proposedList = res.proposed || [];
+      setProposals(proposedList);
+      
+      // Filter claims to ensure they strictly belong to this case
+      const caseClaims = claims.filter((c) => !c.id || (c as any).case_id === targetCaseId || (c as any).caseId === targetCaseId || targetCaseId === caseId);
+      const defaultClaimId = caseClaims.length > 0 ? caseClaims[0].id : '';
+      const initialTargets: { [idx: number]: { claimId: string; relation: 'SUPPORTS' | 'CONTRADICTS' | 'CONTEXT' } } = {};
+      proposedList.forEach((_, idx) => {
+        initialTargets[idx] = { claimId: defaultClaimId, relation: 'SUPPORTS' };
+      });
+      setProposalTargets(initialTargets);
+    } catch (err: any) {
+      setProposalError(err?.message || 'Failed to extract facts from document.');
+    } finally {
+      setIsLoadingProposals(false);
+    }
+  };
+
+  const handleSaveProposal = async (prop: ObservationProposal, idx: number) => {
+    if (!selectedArtifactForReview) return;
+    const targetCaseId = selectedArtifactForReview.caseId || caseId;
+    try {
+      setProposalError(null);
+      // Create observation
+      const obs = await addObservationToCase(
+        targetCaseId,
+        prop.field,
+        prop.value,
+        selectedArtifactForReview.id
+      );
+      // If a claim is selected, link it
+      const target = proposalTargets[idx];
+      if (target && target.claimId) {
+        await linkClaimObservation(targetCaseId, target.claimId, obs.id, target.relation);
+      }
+      setProposalSuccess(`Saved Fact #${obs.id} (${prop.field})`);
+      await refreshData();
+      // Remove the proposal from the list once saved
+      setProposals((prev) => prev.filter((_, i) => i !== idx));
+      setTimeout(() => setProposalSuccess(null), 2000);
+    } catch (err: any) {
+      setProposalError(err?.message || 'Failed to save observation.');
+    }
+  };
+
+  // Manual Fact Entry Workflow
+  const handleOpenAddObservation = (art: Evidence) => {
+    setTargetArtifactForManual(art);
+    setManualField('message_content');
+    setManualValue('');
+    setManualClaimId(claims.length > 0 ? claims[0].id : '');
+    setManualRelation('SUPPORTS');
+    setManualFactError(null);
+    setManualFactModalVisible(true);
+  };
+
+  const handleSaveManualFact = async () => {
+    if (!targetArtifactForManual) return;
+    if (!manualValue.trim()) {
+      setManualFactError('Please enter a factual value or observation text.');
+      return;
+    }
+    setIsSavingManualFact(true);
+    setManualFactError(null);
+    try {
+      const obs = await addObservationToCase(
+        caseId,
+        manualField,
+        manualValue.trim(),
+        targetArtifactForManual.id
+      );
+      if (manualClaimId) {
+        await linkClaimObservation(caseId, manualClaimId, obs.id, manualRelation);
+      }
+      await refreshData();
+      setManualFactModalVisible(false);
+    } catch (err: any) {
+      setManualFactError(err?.message || 'Failed to record fact.');
+    } finally {
+      setIsSavingManualFact(false);
+    }
+  };
+
+  const handleLinkObservation = async (
+    obs: Observation,
+    targetClaimId: string,
+    relation: 'SUPPORTS' | 'CONTRADICTS' | 'CONTEXT'
+  ) => {
+    try {
+      await linkClaimObservation(caseId, targetClaimId, obs.id, relation);
+      await refreshData();
+    } catch (err: any) {
+      Alert.alert('Link Failed', err?.message || 'Could not link fact to claim.');
+    }
+  };
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
+          contentContainerStyle={[
+            styles.scrollContent,
+            isDesktop && styles.desktopScrollContent,
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <View style={styles.header}>
-            <ThemedText type="title">Evidence timeline</ThemedText>
+            <View style={styles.badgeRow}>
+              <View style={styles.workspacePill}>
+                <ThemedText style={styles.workspacePillText}>EVIDENCE REPOSITORY</ThemedText>
+              </View>
+              {availableCases.length > 1 ? (
+                <View style={styles.casePickerRow}>
+                  {availableCases.map((c) => {
+                    const isSelected = c.id === caseId;
+                    return (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => selectCase(c.id)}
+                        style={[styles.caseSelectorPill, isSelected && styles.caseSelectorPillActive]}
+                      >
+                        <ThemedText
+                          type="smallBold"
+                          style={isSelected ? styles.caseSelectorPillTextActive : styles.caseSelectorPillTextInactive}
+                        >
+                          {c.title ? (c.title.length > 20 ? `${c.title.slice(0, 20)}...` : c.title) : c.id}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : (
+                <ThemedText type="small" style={styles.caseBadge}>
+                  {currentCase?.title || `Case #${caseId}`}
+                </ThemedText>
+              )}
+            </View>
+            <ThemedText type="title">{t.evidence.title}</ThemedText>
             <ThemedText type="default" style={styles.subtitle}>
-              Every piece of evidence listed in the order it was received.
+              Chronological log of uploaded digital artifacts, SHA-256 integrity digests, and linked factual observations for case record <ThemedText type="smallBold">"{currentCase?.title || caseId}"</ThemedText>.
             </ThemedText>
           </View>
 
-          {/* 1-Sentence Demo Notice */}
-          <ThemedView type="backgroundElement" style={styles.demoBanner}>
-            <ThemedText type="smallBold" style={styles.demoBannerText}>
-              Sample demo: Uploading and storing real files is not supported in this demo.
+          {/* Transparent Integrity Notice */}
+          <ThemedView type="backgroundElement" style={styles.noticeBanner}>
+            <ThemedText type="smallBold" style={styles.noticeBannerTitle}>
+              🛡 INTEGRITY BOUNDARY NOTICE
+            </ThemedText>
+            <ThemedText type="small" style={styles.noticeBannerText}>
+              ProofPath runs on-device SHA-256 hash checks to detect unexpected file modification. Passing hash validation establishes file consistency, but does not certify historical truth, intent, or legal admissibility.
             </ThemedText>
           </ThemedView>
 
-          {/* Chronological Sorting Controls */}
-          <ThemedView type="backgroundElement" style={styles.controlsCard}>
-            <View style={styles.controlsHeader}>
-              <ThemedText type="smallBold" style={styles.controlsTitle}>
-                SORT ORDER ({sortedEvidence.length} ITEMS)
+          {/* Quick Action Banner to Add Evidence */}
+          <ThemedView type="backgroundElement" style={styles.uploadCtaCard}>
+            <View style={styles.uploadCtaInfo}>
+              <ThemedText type="subtitle" style={styles.uploadCtaTitle}>
+                Add Incident Evidence
               </ThemedText>
-              <ThemedText type="small" style={styles.sortStatusText}>
-                {sortDirection === 'asc' ? 'Oldest first' : 'Newest first'}
+              <ThemedText type="small" style={styles.uploadCtaSub}>
+                Upload photos, documents, or create a tamper-evident text statement with instant cryptographic hashing.
               </ThemedText>
             </View>
+            <Pressable
+              style={styles.openUploadBtn}
+              onPress={() => {
+                setUploadError(null);
+                setUploadSuccess(null);
+                setModalVisible(true);
+              }}
+            >
+              <ThemedText style={styles.openUploadBtnText}>+ Add Evidence</ThemedText>
+            </Pressable>
+          </ThemedView>
 
-            <View style={styles.sortButtonGroup}>
-              <Pressable
-                style={[
-                  styles.sortButton,
-                  sortDirection === 'asc' && styles.sortButtonActive,
-                ]}
-                onPress={() => setSortDirection('asc')}>
-                <ThemedText
-                  type="smallBold"
-                  style={sortDirection === 'asc' ? styles.sortTextActive : styles.sortTextInactive}>
-                  Oldest first
-                </ThemedText>
-              </Pressable>
+          {/* Search, Filter, and Sorting Rail */}
+          <ThemedView type="backgroundElement" style={styles.filterCard}>
+            <View style={styles.searchRow}>
+              <ThemedText style={styles.searchIcon}>🔍</ThemedText>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search artifacts by name, ID, or SHA-256..."
+                placeholderTextColor={Colors.light.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                accessibilityLabel="Search artifacts"
+              />
+              {searchQuery.length > 0 ? (
+                <Pressable onPress={() => setSearchQuery('')} style={styles.clearBtn}>
+                  <ThemedText style={styles.clearBtnText}>✕</ThemedText>
+                </Pressable>
+              ) : null}
+            </View>
 
-              <Pressable
-                style={[
-                  styles.sortButton,
-                  sortDirection === 'desc' && styles.sortButtonActive,
-                ]}
-                onPress={() => setSortDirection('desc')}>
-                <ThemedText
-                  type="smallBold"
-                  style={sortDirection === 'desc' ? styles.sortTextActive : styles.sortTextInactive}>
-                  Newest first
-                </ThemedText>
-              </Pressable>
+            <View style={styles.filterControlsRow}>
+              {/* Type Pills */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typePillScroll}>
+                {['all', 'image', 'document', 'transcript', 'url', 'session'].map((tp) => {
+                  const active = selectedType === tp;
+                  return (
+                    <Pressable
+                      key={tp}
+                      style={[styles.typePill, active && styles.typePillActive]}
+                      onPress={() => setSelectedType(tp)}
+                    >
+                      <ThemedText
+                        type="smallBold"
+                        style={active ? styles.typePillTextActive : styles.typePillTextInactive}
+                      >
+                        {tp === 'all' ? 'All Types' : tp.charAt(0).toUpperCase() + tp.slice(1)}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Sort Toggle */}
+              <View style={styles.sortButtonGroup}>
+                <Pressable
+                  style={[styles.sortButton, sortDirection === 'asc' && styles.sortButtonActive]}
+                  onPress={() => setSortDirection('asc')}
+                >
+                  <ThemedText
+                    type="smallBold"
+                    style={sortDirection === 'asc' ? styles.sortTextActive : styles.sortTextInactive}
+                  >
+                    Oldest
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  style={[styles.sortButton, sortDirection === 'desc' && styles.sortButtonActive]}
+                  onPress={() => setSortDirection('desc')}
+                >
+                  <ThemedText
+                    type="smallBold"
+                    style={sortDirection === 'desc' ? styles.sortTextActive : styles.sortTextInactive}
+                  >
+                    Newest
+                  </ThemedText>
+                </Pressable>
+              </View>
             </View>
           </ThemedView>
 
           {/* Chronological Evidence Cards */}
-          <ThemedText type="smallBold" style={styles.sectionHeader}>
-            ALL EVIDENCE ITEMS ({sortedEvidence.length})
-          </ThemedText>
+          <View style={styles.sectionHeaderRow}>
+            <ThemedText type="smallBold" style={styles.sectionHeader}>
+              EVIDENCE ARTIFACTS ({sortedEvidence.length} of {evidence.length})
+            </ThemedText>
+            <View style={styles.sectionActionButtons}>
+              <Pressable
+                style={styles.addEvidenceSmallBtn}
+                onPress={() => {
+                  setUploadError(null);
+                  setUploadSuccess(null);
+                  setModalVisible(true);
+                }}
+              >
+                <ThemedText style={styles.addEvidenceSmallBtnText}>+ Add Evidence</ThemedText>
+              </Pressable>
+              <Pressable
+                style={styles.addRecordBtn}
+                onPress={() => router.push(`/incident/${caseId}`)}
+              >
+                <ThemedText style={styles.addRecordBtnText}>View Incident →</ThemedText>
+              </Pressable>
+            </View>
+          </View>
 
           {isLoading ? (
-            <ThemedText>Loading evidence timeline...</ThemedText>
+            <ThemedText style={styles.loadingText}>Loading evidence timeline...</ThemedText>
+          ) : sortedEvidence.length === 0 ? (
+            <ThemedView type="backgroundElement" style={styles.emptyCard}>
+              <ThemedText type="subtitle" style={styles.emptyTitle}>
+                No artifacts match your filter
+              </ThemedText>
+              <ThemedText type="small" style={styles.emptyDesc}>
+                Try adjusting your search query or type filter to view recorded evidence.
+              </ThemedText>
+              <Pressable
+                style={styles.emptyAddBtn}
+                onPress={() => {
+                  setUploadError(null);
+                  setUploadSuccess(null);
+                  setModalVisible(true);
+                }}
+              >
+                <ThemedText style={styles.emptyAddBtnText}>+ Add First Evidence Artifact</ThemedText>
+              </Pressable>
+            </ThemedView>
           ) : (
-            sortedEvidence.map((item) => {
-              const linkedObs = observations.filter(
-                (obs) => obs.evidenceId === item.id
-              );
+            sortedEvidence.map((item, idx) => {
+              const linkedObs = observations.filter((obs) => obs.evidenceId === item.id);
               return (
                 <EvidenceTimelineCard
                   key={item.id}
                   evidence={item}
                   observations={linkedObs}
                   claims={claims}
+                  stepNumber={idx + 1}
+                  isFirst={idx === 0}
+                  isLast={idx === sortedEvidence.length - 1}
+                  onAddObservation={handleOpenAddObservation}
+                  onReviewFacts={handleOpenReviewFacts}
+                  onLinkObservationToClaim={handleLinkObservation}
                 />
               );
             })
@@ -109,24 +562,514 @@ export default function EvidenceScreen() {
 
           {/* Obvious Next Action Card */}
           <ThemedView type="backgroundElement" style={styles.nextActionCard}>
-            <ThemedText type="smallBold" style={styles.nextActionTag}>
-              NEXT ACTION
+            <ThemedText type="tag" style={styles.nextActionTag}>
+              NEXT WORKFLOW STEP
             </ThemedText>
             <ThemedText type="subtitle" style={styles.nextActionTitle}>
-              Test removing an item
+              Simulate Claim Consistency in Time Machine
             </ThemedText>
             <ThemedText type="small" style={styles.nextActionDesc}>
-              See how claim conclusions change if a piece of evidence is missing.
+              Discover how conclusions hold up if a key piece of evidence is missing or contested.
             </ThemedText>
             <Pressable
               style={styles.nextActionButton}
-              onPress={() => router.push('/time-machine')}>
+              onPress={() => router.push('/time-machine')}
+            >
               <ThemedText type="smallBold" style={styles.nextActionButtonText}>
-                Go to Time Machine →
+                Open Time Machine & Analysis →
               </ThemedText>
             </Pressable>
           </ThemedView>
         </ScrollView>
+
+        {/* Modal: Add Evidence Artifact (Image, File, Text) */}
+        <Modal
+          visible={modalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <ThemedView type="backgroundElement" style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <ThemedText type="subtitle" style={styles.modalTitle}>
+                    Add Evidence Artifact
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.modalSubtitle}>
+                    Stored in private encrypted vault with SHA-256 integrity hash.
+                  </ThemedText>
+                </View>
+                <Pressable
+                  onPress={() => !isUploading && setModalVisible(false)}
+                  style={styles.modalCloseBtn}
+                >
+                  <ThemedText style={styles.modalCloseText}>✕</ThemedText>
+                </Pressable>
+              </View>
+
+              {/* Mode switch */}
+              <View style={styles.modeTabsRow}>
+                <Pressable
+                  style={[styles.modeTab, uploadMode === 'file' && styles.modeTabActive]}
+                  onPress={() => setUploadMode('file')}
+                >
+                  <ThemedText
+                    type="smallBold"
+                    style={uploadMode === 'file' ? styles.modeTabTextActive : styles.modeTabTextInactive}
+                  >
+                    📁 Upload File / Image
+                  </ThemedText>
+                </Pressable>
+                <Pressable
+                  style={[styles.modeTab, uploadMode === 'text' && styles.modeTabActive]}
+                  onPress={() => setUploadMode('text')}
+                >
+                  <ThemedText
+                    type="smallBold"
+                    style={uploadMode === 'text' ? styles.modeTabTextActive : styles.modeTabTextInactive}
+                  >
+                    📝 Write Text Statement
+                  </ThemedText>
+                </Pressable>
+              </View>
+
+              {uploadError ? (
+                <View style={styles.errorNotice}>
+                  <ThemedText type="smallBold" style={styles.errorNoticeText}>
+                    ⚠ {uploadError}
+                  </ThemedText>
+                </View>
+              ) : null}
+
+              {uploadSuccess ? (
+                <View style={styles.successNotice}>
+                  <ThemedText type="smallBold" style={styles.successNoticeText}>
+                    ✓ {uploadSuccess}
+                  </ThemedText>
+                </View>
+              ) : null}
+
+              {uploadMode === 'file' ? (
+                <View style={styles.fileOptionsArea}>
+                  <Pressable
+                    style={[styles.actionOptionCard, isUploading && styles.disabledCard]}
+                    onPress={handlePickImage}
+                    disabled={isUploading}
+                  >
+                    <View style={styles.actionIconCircle}>
+                      <ThemedText style={styles.actionIcon}>🖼</ThemedText>
+                    </View>
+                    <View style={styles.actionOptionTextCol}>
+                      <ThemedText type="smallBold" style={styles.actionOptionTitle}>
+                        Choose Image / Screenshot
+                      </ThemedText>
+                      <ThemedText type="small" style={styles.actionOptionDesc}>
+                        Select PNG or JPEG photos from gallery or files.
+                      </ThemedText>
+                    </View>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.actionOptionCard, isUploading && styles.disabledCard]}
+                    onPress={handlePickDocument}
+                    disabled={isUploading}
+                  >
+                    <View style={styles.actionIconCircle}>
+                      <ThemedText style={styles.actionIcon}>📄</ThemedText>
+                    </View>
+                    <View style={styles.actionOptionTextCol}>
+                      <ThemedText type="smallBold" style={styles.actionOptionTitle}>
+                        Choose Document / Text File
+                      </ThemedText>
+                      <ThemedText type="small" style={styles.actionOptionDesc}>
+                        Upload PDF, TXT, or CSV logs directly from your device.
+                      </ThemedText>
+                    </View>
+                  </Pressable>
+
+                  {isUploading && (
+                    <View style={styles.uploadingIndicatorRow}>
+                      <ActivityIndicator size="small" color={BrandColors.indigo} />
+                      <ThemedText type="small" style={styles.uploadingText}>
+                        Hashing and registering artifact in vault...
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+              ) : (
+                <View style={styles.textInputArea}>
+                  <ThemedText type="smallBold" style={styles.inputLabel}>
+                    STATEMENT OR FILE NAME
+                  </ThemedText>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="e.g. incident_summary_log"
+                    placeholderTextColor={Colors.light.textMuted}
+                    value={textFileName}
+                    onChangeText={setTextFileName}
+                    editable={!isUploading}
+                  />
+
+                  <ThemedText type="smallBold" style={styles.inputLabel}>
+                    EVIDENCE TEXT / NOTES CONTENT *
+                  </ThemedText>
+                  <TextInput
+                    style={styles.textArea}
+                    placeholder="Enter factual statements, email excerpts, or notes to save as an immutable text artifact..."
+                    placeholderTextColor={Colors.light.textMuted}
+                    multiline
+                    numberOfLines={6}
+                    textAlignVertical="top"
+                    value={textContent}
+                    onChangeText={setTextContent}
+                    editable={!isUploading}
+                  />
+
+                  <Pressable
+                    style={[styles.submitTextBtn, isUploading && styles.disabledBtn]}
+                    onPress={handleUploadTextNote}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <ThemedText type="smallBold" style={styles.submitTextBtnLabel}>
+                        Save as Text Evidence File (.txt)
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                </View>
+              )}
+            </ThemedView>
+          </View>
+        </Modal>
+
+        {/* Modal: Review Extracted Facts */}
+        <Modal
+          visible={reviewModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setReviewModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <ThemedView type="backgroundElement" style={[styles.modalContent, styles.largeModalContent]}>
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="subtitle" style={styles.modalTitle}>
+                    ⚡ Review Extracted Facts
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.modalSubtitle}>
+                    Source: {selectedArtifactForReview?.name} (SHA-256 Verified)
+                  </ThemedText>
+                </View>
+                <Pressable
+                  onPress={() => setReviewModalVisible(false)}
+                  style={styles.modalCloseBtn}
+                >
+                  <ThemedText style={styles.modalCloseText}>✕</ThemedText>
+                </Pressable>
+              </View>
+
+              {proposalError ? (
+                <View style={styles.errorNotice}>
+                  <ThemedText type="smallBold" style={styles.errorNoticeText}>
+                    ⚠ {proposalError}
+                  </ThemedText>
+                </View>
+              ) : null}
+
+              {proposalSuccess ? (
+                <View style={styles.successNotice}>
+                  <ThemedText type="smallBold" style={styles.successNoticeText}>
+                    ✓ {proposalSuccess}
+                  </ThemedText>
+                </View>
+              ) : null}
+
+              {isLoadingProposals ? (
+                <View style={styles.loadingProposalsArea}>
+                  <ActivityIndicator size="large" color={BrandColors.indigo} />
+                  <ThemedText type="smallBold" style={styles.loadingProposalsText}>
+                    Analyzing document text deterministically...
+                  </ThemedText>
+                </View>
+              ) : proposals.length === 0 ? (
+                <View style={styles.emptyProposalsArea}>
+                  <ThemedText style={styles.emptyProposalsTitle}>No structured facts found</ThemedText>
+                  <ThemedText type="small" style={styles.emptyProposalsSub}>
+                    The file text did not contain obvious dates or sender labels. You can record facts manually using "+ Add Fact".
+                  </ThemedText>
+                  <Pressable
+                    style={styles.switchManualBtn}
+                    onPress={() => {
+                      setReviewModalVisible(false);
+                      if (selectedArtifactForReview) {
+                        handleOpenAddObservation(selectedArtifactForReview);
+                      }
+                    }}
+                  >
+                    <ThemedText style={styles.switchManualBtnText}>+ Add Fact Manually</ThemedText>
+                  </Pressable>
+                </View>
+              ) : (
+                <ScrollView style={styles.proposalsScroll} showsVerticalScrollIndicator={true}>
+                  <ThemedText type="small" style={styles.reviewInstructionNotice}>
+                    Review facts extracted from the document before saving to the Case record. Choose which claim each fact supports or contradicts.
+                  </ThemedText>
+
+                  {proposals.map((prop, idx) => {
+                    const currentTarget = proposalTargets[idx] || { claimId: claims[0]?.id || '', relation: 'SUPPORTS' };
+                    return (
+                      <View key={`${prop.field}_${idx}`} style={styles.proposalItemCard}>
+                        <View style={styles.proposalTopRow}>
+                          <View style={styles.proposalBadge}>
+                            <ThemedText style={styles.proposalBadgeText}>{prop.field.toUpperCase()}</ThemedText>
+                          </View>
+                        </View>
+
+                        <ThemedText style={styles.proposalValueText}>
+                          "{prop.value}"
+                        </ThemedText>
+
+                        {prop.excerpt ? (
+                          <ThemedText type="small" style={styles.proposalExcerpt}>
+                            Source excerpt: {prop.excerpt}
+                          </ThemedText>
+                        ) : null}
+
+                        {/* Claim selector & relation */}
+                        {claims.length > 0 && (
+                          <View style={styles.proposalTargetBox}>
+                            <ThemedText type="smallBold" style={styles.targetBoxLabel}>
+                              Target Claim:
+                            </ThemedText>
+                            <View style={styles.claimsPillsRow}>
+                              {claims.map((clm) => {
+                                const isSelected = currentTarget.claimId === clm.id;
+                                return (
+                                  <Pressable
+                                    key={clm.id}
+                                    style={[styles.claimPill, isSelected && styles.claimPillActive]}
+                                    onPress={() =>
+                                      setProposalTargets((prev) => ({
+                                        ...prev,
+                                        [idx]: { ...currentTarget, claimId: clm.id },
+                                      }))
+                                    }
+                                  >
+                                    <ThemedText
+                                      style={isSelected ? styles.claimPillTextActive : styles.claimPillText}
+                                      numberOfLines={1}
+                                    >
+                                      {clm.text}
+                                    </ThemedText>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+
+                            <ThemedText type="smallBold" style={[styles.targetBoxLabel, { marginTop: 6 }]}>
+                              Relation:
+                            </ThemedText>
+                            <View style={styles.relationPillsRow}>
+                              {(['SUPPORTS', 'CONTRADICTS', 'CONTEXT'] as const).map((rel) => {
+                                const isRelSelected = currentTarget.relation === rel;
+                                return (
+                                  <Pressable
+                                    key={rel}
+                                    style={[
+                                      styles.relPill,
+                                      rel === 'SUPPORTS' && isRelSelected && styles.relPillSupportActive,
+                                      rel === 'CONTRADICTS' && isRelSelected && styles.relPillConflictActive,
+                                      rel === 'CONTEXT' && isRelSelected && styles.relPillContextActive,
+                                    ]}
+                                    onPress={() =>
+                                      setProposalTargets((prev) => ({
+                                        ...prev,
+                                        [idx]: { ...currentTarget, relation: rel },
+                                      }))
+                                    }
+                                  >
+                                    <ThemedText
+                                      style={[
+                                        styles.relPillText,
+                                        isRelSelected && styles.relPillTextSelected,
+                                      ]}
+                                    >
+                                      {rel === 'SUPPORTS' ? '✓ Supports' : rel === 'CONTRADICTS' ? '✕ Contradicts' : 'ℹ Context'}
+                                    </ThemedText>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                          </View>
+                        )}
+
+                        <Pressable
+                          style={styles.saveProposalBtn}
+                          onPress={() => handleSaveProposal(prop, idx)}
+                        >
+                          <ThemedText style={styles.saveProposalBtnText}>
+                            Save & Link Fact →
+                          </ThemedText>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </ThemedView>
+          </View>
+        </Modal>
+
+        {/* Modal: Add Manual Fact */}
+        <Modal
+          visible={manualFactModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setManualFactModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <ThemedView type="backgroundElement" style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="subtitle" style={styles.modalTitle}>
+                    + Add Factual Observation
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.modalSubtitle}>
+                    Evidence: {targetArtifactForManual?.name}
+                  </ThemedText>
+                </View>
+                <Pressable
+                  onPress={() => !isSavingManualFact && setManualFactModalVisible(false)}
+                  style={styles.modalCloseBtn}
+                >
+                  <ThemedText style={styles.modalCloseText}>✕</ThemedText>
+                </Pressable>
+              </View>
+
+              {manualFactError ? (
+                <View style={styles.errorNotice}>
+                  <ThemedText type="smallBold" style={styles.errorNoticeText}>
+                    ⚠ {manualFactError}
+                  </ThemedText>
+                </View>
+              ) : null}
+
+              <View style={styles.textInputArea}>
+                <ThemedText type="smallBold" style={styles.inputLabel}>
+                  FACT TYPE / FIELD
+                </ThemedText>
+                <View style={styles.fieldPickerRow}>
+                  {[
+                    { label: 'Timestamp / Date', value: 'timestamp' },
+                    { label: 'Sender', value: 'sender' },
+                    { label: 'Message Content', value: 'message_content' },
+                    { label: 'Platform / Origin', value: 'platform' },
+                  ].map((f) => {
+                    const isSelected = manualField === f.value;
+                    return (
+                      <Pressable
+                        key={f.value}
+                        style={[styles.fieldPickerPill, isSelected && styles.fieldPickerPillActive]}
+                        onPress={() => setManualField(f.value)}
+                      >
+                        <ThemedText style={isSelected ? styles.fieldPickerTextActive : styles.fieldPickerText}>
+                          {f.label}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <ThemedText type="smallBold" style={styles.inputLabel}>
+                  FACT VALUE / OBSERVATION TEXT *
+                </ThemedText>
+                <TextInput
+                  style={styles.textArea}
+                  placeholder="e.g. 2026-10-18 10:20 AM or exact text recorded..."
+                  placeholderTextColor={Colors.light.textMuted}
+                  multiline
+                  numberOfLines={3}
+                  value={manualValue}
+                  onChangeText={setManualValue}
+                  editable={!isSavingManualFact}
+                />
+
+                {claims.length > 0 && (
+                  <>
+                    <ThemedText type="smallBold" style={styles.inputLabel}>
+                      LINK TO CLAIM (OPTIONAL)
+                    </ThemedText>
+                    <View style={styles.claimsPillsRow}>
+                      {claims.map((clm) => {
+                        const isSelected = manualClaimId === clm.id;
+                        return (
+                          <Pressable
+                            key={clm.id}
+                            style={[styles.claimPill, isSelected && styles.claimPillActive]}
+                            onPress={() => setManualClaimId(isSelected ? '' : clm.id)}
+                          >
+                            <ThemedText
+                              style={isSelected ? styles.claimPillTextActive : styles.claimPillText}
+                              numberOfLines={1}
+                            >
+                              {clm.text}
+                            </ThemedText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+
+                    {manualClaimId ? (
+                      <View style={styles.relationPillsRow}>
+                        {(['SUPPORTS', 'CONTRADICTS', 'CONTEXT'] as const).map((rel) => {
+                          const isRelSelected = manualRelation === rel;
+                          return (
+                            <Pressable
+                              key={rel}
+                              style={[
+                                styles.relPill,
+                                rel === 'SUPPORTS' && isRelSelected && styles.relPillSupportActive,
+                                rel === 'CONTRADICTS' && isRelSelected && styles.relPillConflictActive,
+                                rel === 'CONTEXT' && isRelSelected && styles.relPillContextActive,
+                              ]}
+                              onPress={() => setManualRelation(rel)}
+                            >
+                              <ThemedText
+                                style={[
+                                  styles.relPillText,
+                                  isRelSelected && styles.relPillTextSelected,
+                                ]}
+                              >
+                                {rel === 'SUPPORTS' ? '✓ Supports' : rel === 'CONTRADICTS' ? '✕ Contradicts' : 'ℹ Context'}
+                              </ThemedText>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    ) : null}
+                  </>
+                )}
+
+                <Pressable
+                  style={[styles.submitTextBtn, isSavingManualFact && styles.disabledBtn]}
+                  onPress={handleSaveManualFact}
+                  disabled={isSavingManualFact}
+                >
+                  {isSavingManualFact ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <ThemedText type="smallBold" style={styles.submitTextBtnLabel}>
+                      Save Fact to Case Record
+                    </ThemedText>
+                  )}
+                </Pressable>
+              </View>
+            </ThemedView>
+          </View>
+        </Modal>
       </SafeAreaView>
     </ThemedView>
   );
@@ -135,133 +1078,731 @@ export default function EvidenceScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Colors.light.background,
   },
   safeArea: {
     flex: 1,
-    alignItems: 'center',
   },
   scroll: {
     width: '100%',
   },
   scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 48,
+    gap: 16,
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.six,
-    gap: Spacing.three,
+  },
+  desktopScrollContent: {
+    paddingHorizontal: 32,
+    paddingTop: 24,
+    maxWidth: 1080,
   },
   header: {
-    marginBottom: Spacing.one,
+    gap: 6,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
+  workspacePill: {
+    backgroundColor: BrandColors.indigoLight,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 100,
+  },
+  workspacePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: BrandColors.indigo,
+    letterSpacing: 0.5,
+  },
+  caseBadge: {
+    color: Colors.light.textSecondary,
+    fontWeight: '500',
   },
   subtitle: {
-    opacity: 0.75,
-    marginTop: Spacing.half,
+    color: Colors.light.textSecondary,
     lineHeight: 20,
-    fontSize: 14,
   },
-  demoBanner: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-    backgroundColor: BrandColors.indigoLight,
+  noticeBanner: {
+    backgroundColor: BrandColors.tealLight,
     borderWidth: 1,
-    borderColor: '#C7D2FE',
+    borderColor: BrandColors.tealBorder,
+    borderRadius: 12,
+    padding: 14,
+    gap: 4,
   },
-  demoBannerText: {
-    color: BrandColors.indigo,
-    fontSize: 13,
+  noticeBannerTitle: {
+    color: BrandColors.teal,
+    letterSpacing: 0.5,
+  },
+  noticeBannerText: {
+    color: '#0F766E',
     lineHeight: 18,
   },
-  controlsCard: {
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+  filterCard: {
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: BrandColors.border,
-    gap: Spacing.two,
+    borderColor: Colors.light.border,
+    padding: 14,
+    gap: 12,
   },
-  controlsHeader: {
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.light.backgroundSubtle,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    paddingHorizontal: 10,
+    height: 40,
+    gap: 8,
+  },
+  searchIcon: {
+    fontSize: 14,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.light.text,
+    outlineStyle: 'none' as any,
+  },
+  clearBtn: {
+    padding: 4,
+  },
+  clearBtnText: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+  },
+  filterControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  typePillScroll: {
+    flexGrow: 0,
+  },
+  typePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 100,
+    backgroundColor: Colors.light.backgroundSubtle,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  typePillActive: {
+    backgroundColor: BrandColors.indigo,
+    borderColor: BrandColors.indigo,
+  },
+  typePillTextActive: {
+    color: '#FFFFFF',
+    fontSize: 12,
+  },
+  typePillTextInactive: {
+    color: Colors.light.textSecondary,
+    fontSize: 12,
+  },
+  sortButtonGroup: {
+    flexDirection: 'row',
+    backgroundColor: Colors.light.backgroundSubtle,
+    borderRadius: 8,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  sortButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  sortButtonActive: {
+    backgroundColor: '#FFFFFF',
+    ...(Platform.OS === 'web' ? { boxShadow: '0 1px 2px rgba(0,0,0,0.05)' } : { elevation: 1 }),
+  },
+  sortTextActive: {
+    fontSize: 12,
+    color: BrandColors.indigo,
+  },
+  sortTextInactive: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  sectionHeader: {
+    color: Colors.light.textSecondary,
+    fontSize: 12,
+    letterSpacing: 0.5,
+  },
+  addRecordBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  addRecordBtnText: {
+    fontSize: 13,
+    color: BrandColors.indigo,
+    fontWeight: '600',
+  },
+  loadingText: {
+    paddingVertical: 20,
+    textAlign: 'center',
+    color: Colors.light.textSecondary,
+  },
+  emptyCard: {
+    padding: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    color: Colors.light.text,
+  },
+  emptyDesc: {
+    color: Colors.light.textSecondary,
+    textAlign: 'center',
+  },
+  nextActionCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BrandColors.indigoBorder,
+    backgroundColor: BrandColors.indigoLight,
+    padding: 20,
+    gap: 8,
+    marginTop: 16,
+  },
+  nextActionTag: {
+    color: BrandColors.indigo,
+  },
+  nextActionTitle: {
+    color: Colors.light.text,
+    fontSize: 17,
+  },
+  nextActionDesc: {
+    color: Colors.light.textSecondary,
+    lineHeight: 18,
+  },
+  nextActionButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: BrandColors.indigo,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  nextActionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+  },
+  /* Upload CTA & Action Buttons */
+  uploadCtaCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BrandColors.indigoBorder,
+    backgroundColor: BrandColors.indigoLight,
+    gap: 12,
+  },
+  uploadCtaInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  uploadCtaTitle: {
+    color: BrandColors.indigo,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  uploadCtaSub: {
+    color: Colors.light.textSecondary,
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  openUploadBtn: {
+    backgroundColor: BrandColors.indigo,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 8,
+    alignSelf: 'center',
+  },
+  openUploadBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  sectionActionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addEvidenceSmallBtn: {
+    backgroundColor: BrandColors.indigo,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  addEvidenceSmallBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  emptyAddBtn: {
+    marginTop: 8,
+    backgroundColor: BrandColors.indigo,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  emptyAddBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  /* Modal Styles */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 520,
+    borderRadius: 16,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    gap: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.light.text,
+  },
+  modalSubtitle: {
+    color: Colors.light.textSecondary,
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    padding: 6,
+    borderRadius: 16,
+    backgroundColor: Colors.light.border,
+  },
+  modalCloseText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.light.text,
+  },
+  modeTabsRow: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    backgroundColor: Colors.light.border,
+    padding: 3,
+    gap: 4,
+  },
+  modeTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  modeTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  modeTabTextActive: {
+    color: BrandColors.indigo,
+    fontSize: 13,
+  },
+  modeTabTextInactive: {
+    color: Colors.light.textSecondary,
+    fontSize: 13,
+  },
+  errorNotice: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#F87171',
+    padding: 10,
+    borderRadius: 8,
+  },
+  errorNoticeText: {
+    color: '#991B1B',
+    fontSize: 12,
+  },
+  successNotice: {
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#4ADE80',
+    padding: 10,
+    borderRadius: 8,
+  },
+  successNoticeText: {
+    color: '#166534',
+    fontSize: 12,
+  },
+  fileOptionsArea: {
+    gap: 12,
+    marginTop: 4,
+  },
+  actionOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    backgroundColor: Colors.light.background,
+    gap: 14,
+  },
+  disabledCard: {
+    opacity: 0.6,
+  },
+  actionIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: BrandColors.indigoLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionIcon: {
+    fontSize: 22,
+  },
+  actionOptionTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  actionOptionTitle: {
+    fontSize: 14,
+    color: Colors.light.text,
+  },
+  actionOptionDesc: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+    lineHeight: 16,
+  },
+  uploadingIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 10,
+  },
+  uploadingText: {
+    color: BrandColors.indigo,
+    fontWeight: '600',
+  },
+  textInputArea: {
+    gap: 10,
+    marginTop: 4,
+  },
+  inputLabel: {
+    fontSize: 11,
+    letterSpacing: 0.5,
+    color: Colors.light.textSecondary,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: Colors.light.text,
+    backgroundColor: Colors.light.background,
+  },
+  textArea: {
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: Colors.light.text,
+    backgroundColor: Colors.light.background,
+    minHeight: 110,
+  },
+  submitTextBtn: {
+    backgroundColor: BrandColors.indigo,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  submitTextBtnLabel: {
+    color: '#FFFFFF',
+    fontSize: 14,
+  },
+  disabledBtn: {
+    opacity: 0.6,
+  },
+  casePickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    alignItems: 'center',
+  },
+  caseSelectorPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+    backgroundColor: Colors.light.backgroundSubtle,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  caseSelectorPillActive: {
+    backgroundColor: BrandColors.indigoLight,
+    borderColor: BrandColors.indigoBorder,
+  },
+  caseSelectorPillTextActive: {
+    color: BrandColors.indigo,
+    fontSize: 11,
+  },
+  caseSelectorPillTextInactive: {
+    color: Colors.light.textSecondary,
+    fontSize: 11,
+  },
+  largeModalContent: {
+    maxHeight: '90%',
+  },
+  loadingProposalsArea: {
+    paddingVertical: 36,
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingProposalsText: {
+    color: BrandColors.indigo,
+    fontSize: 13,
+  },
+  emptyProposalsArea: {
+    paddingVertical: 30,
+    alignItems: 'center',
+    gap: 10,
+  },
+  emptyProposalsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.light.text,
+  },
+  emptyProposalsSub: {
+    textAlign: 'center',
+    color: Colors.light.textSecondary,
+    maxWidth: 320,
+    lineHeight: 18,
+  },
+  switchManualBtn: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: BrandColors.indigo,
+  },
+  switchManualBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  proposalsScroll: {
+    marginTop: 8,
+    maxHeight: 460,
+  },
+  reviewInstructionNotice: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    color: '#1E40AF',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+    lineHeight: 16,
+  },
+  proposalItemCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  proposalTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  controlsTitle: {
-    fontSize: 12,
-    color: BrandColors.muted,
+  proposalBadge: {
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
   },
-  sortStatusText: {
-    fontSize: 12,
-    color: BrandColors.indigo,
-    fontWeight: '600',
-  },
-  sortButtonGroup: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  sortButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: Spacing.two,
-    borderRadius: Spacing.two,
-    borderWidth: 1,
-    borderColor: BrandColors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  sortButtonActive: {
-    backgroundColor: BrandColors.indigo,
-    borderColor: BrandColors.indigo,
-  },
-  sortTextActive: {
-    color: '#ffffff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  sortTextInactive: {
-    color: BrandColors.muted,
-    fontSize: 13,
-  },
-  sectionHeader: {
-    opacity: 0.7,
-    marginTop: Spacing.one,
-    fontSize: 12,
-    letterSpacing: 0.5,
-  },
-  nextActionCard: {
-    padding: Spacing.four,
-    borderRadius: Spacing.three,
-    borderWidth: 1,
-    borderColor: BrandColors.border,
-    gap: Spacing.one,
-    marginTop: Spacing.two,
-  },
-  nextActionTag: {
+  proposalBadgeText: {
+    color: '#6D28D9',
     fontSize: 11,
-    color: BrandColors.indigo,
+    fontWeight: '800',
+  },
+  proposalConfidence: {
+    color: '#16A34A',
+    fontSize: 11,
+  },
+  proposalValueText: {
+    fontSize: 14,
+    color: '#0F172A',
+    fontWeight: '600',
+    backgroundColor: '#FFFFFF',
+    padding: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  proposalExcerpt: {
+    fontSize: 11,
+    color: '#64748B',
+    fontStyle: 'italic',
+  },
+  proposalTargetBox: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 6,
+    padding: 8,
+    gap: 4,
+  },
+  targetBoxLabel: {
+    fontSize: 10,
+    color: '#475569',
     letterSpacing: 0.5,
   },
-  nextActionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  claimsPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  claimPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    maxWidth: 240,
+  },
+  claimPillActive: {
+    backgroundColor: '#EFF6FF',
+    borderColor: '#3B82F6',
+  },
+  claimPillText: {
+    fontSize: 11,
+    color: '#475569',
+  },
+  claimPillTextActive: {
+    fontSize: 11,
+    color: '#1D4ED8',
+    fontWeight: '700',
+  },
+  relationPillsRow: {
+    flexDirection: 'row',
+    gap: 6,
     marginTop: 2,
   },
-  nextActionDesc: {
-    fontSize: 13,
-    opacity: 0.75,
-    lineHeight: 18,
+  relPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
   },
-  nextActionButton: {
-    backgroundColor: BrandColors.indigo,
-    paddingVertical: 10,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.two,
-    alignSelf: 'flex-start',
-    marginTop: Spacing.one,
+  relPillSupportActive: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#22C55E',
   },
-  nextActionButtonText: {
-    color: '#ffffff',
-    fontSize: 13,
+  relPillConflictActive: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#EF4444',
+  },
+  relPillContextActive: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+  },
+  relPillText: {
+    fontSize: 11,
+    color: '#475569',
     fontWeight: '600',
+  },
+  relPillTextSelected: {
+    color: '#0F172A',
+    fontWeight: '700',
+  },
+  saveProposalBtn: {
+    backgroundColor: BrandColors.indigo,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  saveProposalBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  fieldPickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  fieldPickerPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  fieldPickerPillActive: {
+    backgroundColor: BrandColors.indigoLight,
+    borderColor: BrandColors.indigo,
+  },
+  fieldPickerText: {
+    fontSize: 12,
+    color: '#475569',
+  },
+  fieldPickerTextActive: {
+    fontSize: 12,
+    color: BrandColors.indigo,
+    fontWeight: '700',
   },
 });

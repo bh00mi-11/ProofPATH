@@ -35,6 +35,7 @@ import { ALL_DISCLOSURE_FIELDS, ICaseService } from '@/services/case-service';
 
 interface CaseContextValue {
   currentCase: IncidentCase | null;
+  availableCases: IncidentCase[];
   evidence: Evidence[];
   observations: Observation[];
   claims: Claim[];
@@ -44,11 +45,19 @@ interface CaseContextValue {
   scenarioResult: ScenarioResult | null;
   disclosurePreview: DisclosurePreview | null;
   isLoading: boolean;
+  backendError: string | null;
   toggleEvidenceExclusion: (evidenceId: string) => Promise<void>;
   restoreOriginalState: () => Promise<void>;
   setSelectedRecipient: (recipient: RecipientType) => Promise<void>;
   toggleDisclosureField: (field: string) => Promise<void>;
-  refreshData: () => Promise<void>;
+  refreshData: (targetCaseId?: string) => Promise<void>;
+  selectCase: (caseId: string) => Promise<void>;
+  createNewCase: (title: string, description?: string) => Promise<IncidentCase>;
+  addClaimToCase: (caseId: string, text: string, category?: string) => Promise<Claim>;
+  addObservationToCase: (caseId: string, field: string, value: string, artifactId?: string) => Promise<Observation>;
+  uploadEvidenceToCase: (caseId: string, file: any) => Promise<Evidence>;
+  linkClaimObservation: (caseId: string, claimId: string, observationId: string, relation?: 'SUPPORTS' | 'CONTRADICTS' | 'CONTEXT') => Promise<void>;
+  unlinkClaimObservation: (caseId: string, claimId: string, observationId: string) => Promise<void>;
 }
 
 const CaseContext = createContext<CaseContextValue | undefined>(undefined);
@@ -71,53 +80,56 @@ export function CaseProvider({ children }: { children: ReactNode }) {
     useState<DisclosurePreview | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Service selection: prefer FastAPI backend, fallback to mock if unreachable
-  const getActiveService = async (): Promise<ICaseService> => {
-    try {
-      const live = await apiCaseService.getCase('case_demo_01');
-      if (live) return apiCaseService;
-    } catch {
-      // Backend offline or unreachable, fallback to mock demo
-    }
-    return mockCaseService;
-  };
+  // Live backend connection state
+  const [backendError, setBackendError] = useState<string | null>(null);
 
-  // Initial load of case data
-  const refreshData = useCallback(async () => {
+  const [availableCases, setAvailableCases] = useState<IncidentCase[]>([]);
+  const [currentCaseId, setCurrentCaseId] = useState<string>('case_demo_01');
+
+  // Initial load and reload of case data
+  const refreshData = useCallback(async (targetCaseId?: string) => {
     setIsLoading(true);
+    setBackendError(null);
     try {
-      let svc: ICaseService = mockCaseService;
-      try {
-        const live = await apiCaseService.getCase('case_demo_01');
-        if (live) svc = apiCaseService;
-      } catch {
-        svc = mockCaseService;
-      }
-
-      const [caseData, evData, obsData, clmData, initialScenario, initialPreview] =
+      const activeId = targetCaseId || currentCaseId || 'case_demo_01';
+      const [allCases, fullData, initialScenario, initialPreview] =
         await Promise.all([
-          svc.getCase(),
-          svc.getEvidence(),
-          svc.getObservations(),
-          svc.getClaims(),
-          svc.runTimeMachineScenario([]),
-          svc.getDisclosurePreview(
+          apiCaseService.getCases().catch(() => []),
+          apiCaseService.getFullCase(activeId),
+          apiCaseService.runScenario(activeId, []).catch(() => null),
+          apiCaseService.getDisclosurePreview(
             'TRUSTED_CONTACT',
             [...ALL_DISCLOSURE_FIELDS]
-          ),
+          ).catch(() => null),
         ]);
 
-      setCurrentCase(caseData);
-      setEvidence(evData);
-      setObservations(obsData);
-      setClaims(clmData);
+      setAvailableCases(allCases);
+      setCurrentCase(fullData.case);
+      setCurrentCaseId(fullData.case.id);
+      setEvidence(fullData.artifacts);
+      setObservations(fullData.observations);
+      setClaims(fullData.claims);
       setExcludedEvidenceIds([]);
       setScenarioResult(initialScenario);
       setDisclosurePreview(initialPreview);
+    } catch (err: any) {
+      const errMsg = err?.message || 'Cannot reach ProofPath FastAPI backend at http://localhost:8000';
+      setBackendError(errMsg);
+      setCurrentCase(null);
+      setEvidence([]);
+      setObservations([]);
+      setClaims([]);
+      setScenarioResult(null);
+      setDisclosurePreview(null);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentCaseId]);
+
+  const selectCase = useCallback(async (caseId: string) => {
+    setCurrentCaseId(caseId);
+    await refreshData(caseId);
+  }, [refreshData]);
 
   useEffect(() => {
     refreshData();
@@ -131,9 +143,12 @@ export function CaseProvider({ children }: { children: ReactNode }) {
         : [...excludedEvidenceIds, evidenceId];
 
       setExcludedEvidenceIds(nextExclusions);
-      const svc = await getActiveService();
-      const newScenario = await svc.runTimeMachineScenario(nextExclusions);
-      setScenarioResult(newScenario);
+      try {
+        const newScenario = await apiCaseService.runTimeMachineScenario(nextExclusions);
+        setScenarioResult(newScenario);
+      } catch (err: any) {
+        setBackendError(err?.message || 'Scenario calculation failed on backend');
+      }
     },
     [excludedEvidenceIds]
   );
@@ -141,21 +156,27 @@ export function CaseProvider({ children }: { children: ReactNode }) {
   // Restore Time Machine state back to baseline
   const restoreOriginalState = useCallback(async () => {
     setExcludedEvidenceIds([]);
-    const svc = await getActiveService();
-    const baselineScenario = await svc.runTimeMachineScenario([]);
-    setScenarioResult(baselineScenario);
+    try {
+      const baselineScenario = await apiCaseService.runTimeMachineScenario([]);
+      setScenarioResult(baselineScenario);
+    } catch (err: any) {
+      setBackendError(err?.message || 'Scenario restore failed on backend');
+    }
   }, []);
 
   // Update selected recipient for Privacy Preview
   const setSelectedRecipient = useCallback(
     async (recipient: RecipientType) => {
       setSelectedRecipientState(recipient);
-      const svc = await getActiveService();
-      const updatedPreview = await svc.getDisclosurePreview(
-        recipient,
-        includedDisclosureFields
-      );
-      setDisclosurePreview(updatedPreview);
+      try {
+        const updatedPreview = await apiCaseService.getDisclosurePreview(
+          recipient,
+          includedDisclosureFields
+        );
+        setDisclosurePreview(updatedPreview);
+      } catch (err: any) {
+        setBackendError(err?.message || 'Privacy disclosure preview failed on backend');
+      }
     },
     [includedDisclosureFields]
   );
@@ -168,20 +189,124 @@ export function CaseProvider({ children }: { children: ReactNode }) {
         : [...includedDisclosureFields, field];
 
       setIncludedDisclosureFields(nextFields);
-      const svc = await getActiveService();
-      const updatedPreview = await svc.getDisclosurePreview(
-        selectedRecipient,
-        nextFields
-      );
-      setDisclosurePreview(updatedPreview);
+      try {
+        const updatedPreview = await apiCaseService.getDisclosurePreview(
+          selectedRecipient,
+          nextFields
+        );
+        setDisclosurePreview(updatedPreview);
+      } catch (err: any) {
+        setBackendError(err?.message || 'Field toggle failed on backend');
+      }
     },
     [includedDisclosureFields, selectedRecipient]
+  );
+
+  const createNewCase = useCallback(
+    async (title: string, description: string = ''): Promise<IncidentCase> => {
+      setIsLoading(true);
+      setBackendError(null);
+      try {
+        const newCase = await apiCaseService.createCase(title, description);
+        setCurrentCase(newCase);
+        setEvidence([]);
+        setObservations([]);
+        setClaims([]);
+        setExcludedEvidenceIds([]);
+        return newCase;
+      } catch (err: any) {
+        const msg = err?.message || 'Failed to create new case record';
+        setBackendError(msg);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const addClaimToCase = useCallback(
+    async (caseId: string, text: string, category: string = 'Incident Observation'): Promise<Claim> => {
+      try {
+        const newClaim = await apiCaseService.createClaim(caseId, text, category);
+        setClaims((prev) => [...prev, newClaim]);
+        return newClaim;
+      } catch (err: any) {
+        const msg = err?.message || 'Failed to record claim';
+        setBackendError(msg);
+        throw err;
+      }
+    },
+    []
+  );
+
+  const addObservationToCase = useCallback(
+    async (caseId: string, field: string, value: string, artifactId?: string): Promise<Observation> => {
+      try {
+        const newObs = await apiCaseService.createObservation(caseId, field, value, artifactId);
+        setObservations((prev) => [...prev, newObs]);
+        return newObs;
+      } catch (err: any) {
+        const msg = err?.message || 'Failed to record observation';
+        setBackendError(msg);
+        throw err;
+      }
+    },
+    []
+  );
+
+  const uploadEvidenceToCase = useCallback(
+    async (caseId: string, file: any): Promise<Evidence> => {
+      setIsLoading(true);
+      try {
+        const newEvidence = await apiCaseService.uploadEvidence(caseId, file);
+        setEvidence((prev) => [...prev, newEvidence]);
+        await refreshData();
+        return newEvidence;
+      } catch (err: any) {
+        const msg = err?.message || 'Failed to upload evidence artifact';
+        setBackendError(msg);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [refreshData]
+  );
+
+  const linkClaimObservation = useCallback(
+    async (caseId: string, claimId: string, observationId: string, relation: 'SUPPORTS' | 'CONTRADICTS' | 'CONTEXT' = 'SUPPORTS') => {
+      try {
+        await apiCaseService.linkClaimObservation(caseId, claimId, observationId, relation);
+        await refreshData(caseId);
+      } catch (err: any) {
+        const msg = err?.message || 'Failed to link observation to claim';
+        setBackendError(msg);
+        throw err;
+      }
+    },
+    [refreshData]
+  );
+
+  const unlinkClaimObservation = useCallback(
+    async (caseId: string, claimId: string, observationId: string) => {
+      try {
+        await apiCaseService.unlinkClaimObservation(caseId, claimId, observationId);
+        await refreshData(caseId);
+      } catch (err: any) {
+        const msg = err?.message || 'Failed to unlink observation from claim';
+        setBackendError(msg);
+        throw err;
+      }
+    },
+    [refreshData]
   );
 
   return (
     <CaseContext.Provider
       value={{
         currentCase,
+        availableCases,
         evidence,
         observations,
         claims,
@@ -191,11 +316,19 @@ export function CaseProvider({ children }: { children: ReactNode }) {
         scenarioResult,
         disclosurePreview,
         isLoading,
+        backendError,
         toggleEvidenceExclusion,
         restoreOriginalState,
         setSelectedRecipient,
         toggleDisclosureField,
         refreshData,
+        selectCase,
+        createNewCase,
+        addClaimToCase,
+        addObservationToCase,
+        uploadEvidenceToCase,
+        linkClaimObservation,
+        unlinkClaimObservation,
       }}>
       {children}
     </CaseContext.Provider>

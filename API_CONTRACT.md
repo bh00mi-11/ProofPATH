@@ -275,3 +275,74 @@ Response:
   - Scans both extracted document text and document metadata against `redacted_terms` and seeded sensitive identifiers.
   - If any forbidden term is detected, download is aborted and returns `HTTP 400 Privacy check failed!`.
 
+---
+
+## 7. Next-Step Navigator (Actionable Guidance)
+### `GET /api/navigator/{case_id}`
+Returns actionable next steps based on case state, readiness score, and interactive checklist items.
+
+Response:
+```json
+{
+  "status": "success",
+  "data": {
+    "case_id": "case_demo_01",
+    "readiness_score": 75,
+    "current_stage": "STRENGTHEN_EVIDENCE",
+    "actionable_recommendations": [
+      {
+        "id": "rec_01",
+        "priority": "HIGH",
+        "action": "Resolve timestamp contradiction in observation #2",
+        "category": "VERIFICATION"
+      }
+    ],
+    "checklist": [
+      {"id": "chk_01", "label": "Preserve raw email exports", "completed": true},
+      {"id": "chk_02", "label": "Consult support representative", "completed": false}
+    ]
+  }
+}
+```
+
+### `POST /api/navigator/{case_id}/checklist/{item_id}`
+Toggles checklist item completion status.
+
+---
+
+## 8. Accountability Trail & Escalation Log
+### `GET /api/cases/{case_id}/accountability`
+Retrieves chronological escalation log, recipient submissions, and response SLA tracking.
+
+### `POST /api/cases/{case_id}/accountability`
+Records an institutional outreach or escalation event.
+
+Request Body:
+```json
+{
+  "case_id": "case_demo_01",
+  "recipient_name": "HR Department / Ombudsperson",
+  "recipient_role": "INSTITUTIONAL_HR",
+  "submission_method": "EMAIL",
+  "reference_number": "REF-2026-098",
+  "notes": "Sent redacted timeline and initial complaint.",
+  "expected_response_days": 14
+}
+```
+
+---
+
+## 9. Remedies & Legal Context Engine
+### `GET /api/cases/{case_id}/remedies`
+Provides recommended pathways, remedy options, and support pathways matching the case type.
+
+### `GET /api/cases/{case_id}/legal-context`
+Generates statutory and jurisdiction-specific framework mappings based on incident categories.
+
+---
+
+## 10. Guardian Mode & Stealth Protections
+Safety protections for vulnerable users:
+- Client-side fast wipe / stealth redirect triggers.
+- In-memory vault zeroing options.
+- Guardian emergency purge: `POST /api/cases/{case_id}/guardian/purge`

@@ -107,14 +107,24 @@ def recompute_claim_states(
             elif rel == "CONTRADICTS":
                 contradicting_obs.append(obs)
 
-        # Check for planted or inherent date/timestamp conflicts among active supporting observations
+        # Check for planted or inherent date/timestamp conflicts among active supporting observations:
+        # A contradiction exists if the claim specifies an incident_time and supporting timestamps disagree with it,
+        # or if the claim is about a single event/timeline (e.g. category 'Timeline' or field 'event_timestamp') with conflicting timestamps.
         timestamps = set()
         has_time_conflict = False
+        claim_time = (c.get("incident_time") or "").strip()
+        claim_cat = (c.get("category") or "").lower()
+
         for s in supporting_obs:
-            if s.get("field") == "timestamp":
-                timestamps.add(s.get("value"))
+            if s.get("field") in ["timestamp", "date", "time", "event_timestamp"]:
+                val = s.get("value", "").strip()
+                if val:
+                    timestamps.add(val)
+
         if len(timestamps) > 1:
-            has_time_conflict = True
+            # If claim has category 'timeline' or if claim has a specific incident_time that differs from one of the timestamps
+            if "timeline" in claim_cat or claim_time:
+                has_time_conflict = True
 
         # Determine deterministic state with strict precedence rules:
         # Precedence 1: Integrity failure on an associated source -> REVIEW_NEEDED

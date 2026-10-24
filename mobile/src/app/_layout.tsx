@@ -5,6 +5,7 @@ import { Platform, useColorScheme } from 'react-native';
 
 import AppTabs from '@/components/app-tabs';
 import { CaseProvider } from '@/context/CaseContext';
+import { LanguageProvider } from '@/context/LanguageContext';
 
 if (Platform.OS !== 'web') {
   SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -23,10 +24,12 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <CaseProvider>
-        <AppTabs />
-      </CaseProvider>
+    <ThemeProvider value={DefaultTheme}>
+      <LanguageProvider>
+        <CaseProvider>
+          <AppTabs />
+        </CaseProvider>
+      </LanguageProvider>
     </ThemeProvider>
   );
 }
