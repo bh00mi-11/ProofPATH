@@ -13,11 +13,9 @@ export interface Evidence {
   id: string;
   caseId: string;
   name: string;
-  type: 'image' | 'document' | 'transcript' | 'url' | 'session' | string;
+  type: 'image' | 'document' | 'transcript' | 'url' | 'session';
   ingestedAt: string;
   integrity: 'MATCH' | 'MISMATCH' | 'NOT_CHECKED';
-  sha256?: string;
-  fileSize?: number;
 }
 
 export interface Observation {
@@ -25,9 +23,6 @@ export interface Observation {
   evidenceId: string;
   text: string;
   recordedAt: string;
-  field?: string;
-  value?: string;
-  sourceType?: string;
 }
 
 export interface Claim {
@@ -37,8 +32,6 @@ export interface Claim {
   supportingObservationIds: string[];
   conflictingObservationIds: string[];
   explanation: string;
-  category?: string;
-  incidentTime?: string;
 }
 
 export interface ClaimChange {
@@ -46,18 +39,12 @@ export interface ClaimChange {
   before: ClaimStatus;
   after: ClaimStatus;
   reason: string;
-  claimText?: string;
-  baselineSupporting?: string[];
-  scenarioSupporting?: string[];
 }
 
 export interface ScenarioResult {
   scenarioId: string;
   excludedEvidenceIds: string[];
   changes: ClaimChange[];
-  claims?: Claim[];
-  baselineClaims?: Claim[];
-  affectedClaimsCount?: number;
 }
 
 export interface DisclosurePreview {
@@ -66,8 +53,6 @@ export interface DisclosurePreview {
   excludedFields: string[];
   warnings: string[];
   canExport: boolean;
-  disclaimer?: string;
-  includedClaimsCount?: number;
 }
 
 export interface IncidentCase {

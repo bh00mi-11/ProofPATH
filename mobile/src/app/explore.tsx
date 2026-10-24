@@ -45,7 +45,7 @@ export default function TabTwoScreen() {
           </ThemedText>
 
           <ExternalLink href="https://docs.expo.dev" asChild>
-            <Pressable style={({ pressed }) => StyleSheet.flatten(pressed ? styles.pressed : undefined)}>
+            <Pressable style={({ pressed }) => pressed && styles.pressed}>
               <ThemedView type="backgroundElement" style={styles.linkButton}>
                 <ThemedText type="link">Expo documentation</ThemedText>
                 <SymbolView

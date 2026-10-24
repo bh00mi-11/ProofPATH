@@ -1,6 +1,7 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://unistyl.es/), etc.
+ * ProofPath Theme & Color Palette
+ * -------------------------------------------------------------
+ * Calm Indigo/Purple palette with clean white cards and readable text.
  */
 
 import '@/global.css';
@@ -9,43 +10,46 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#172033',
-    background: '#FAF9F7',
+    text: '#0F172A',
+    background: '#F8FAFC',
     backgroundElement: '#FFFFFF',
-    backgroundSelected: '#EEEAFB',
-    textSecondary: '#667085',
+    backgroundSelected: '#EEF2FF',
+    textSecondary: '#475569',
   },
   dark: {
-    text: '#ffffff',
-    background: '#111827',
-    backgroundElement: '#1D2534',
-    backgroundSelected: '#30285A',
-    textSecondary: '#B0B4BA',
+    text: '#F8FAFC',
+    background: '#0B0F19',
+    backgroundElement: '#151D2F',
+    backgroundSelected: '#232D48',
+    textSecondary: '#94A3B8',
   },
-} as const;
-
-export const ProofPathPalette = {
-  primary: '#3730A3',
-  accent: '#8B5CF6',
-  success: '#0F766E',
-  warning: '#B45309',
-  danger: '#B42318',
-  border: '#E7E4EE',
-  lavender: '#F1EEFF',
-  white: '#FFFFFF',
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+export const BrandColors = {
+  indigo: '#4F46E5',
+  indigoHover: '#4338CA',
+  indigoLight: '#EEF2FF',
+  purple: '#7C3AED',
+  purpleLight: '#F5F3FF',
+  border: '#E2E8F0',
+  borderDark: '#232D48',
+  success: '#059669',
+  successLight: '#ECFDF5',
+  danger: '#DC2626',
+  dangerLight: '#FEF2F2',
+  warning: '#D97706',
+  warningLight: '#FFFBEB',
+  muted: '#64748B',
+  mutedLight: '#F1F5F9',
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
@@ -55,10 +59,10 @@ export const Fonts = Platform.select({
     mono: 'monospace',
   },
   web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
+    sans: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    serif: 'ui-serif',
+    rounded: 'ui-rounded',
+    mono: 'ui-monospace, monospace',
   },
 });
 
@@ -72,5 +76,5 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;
+export const BottomTabInset = Platform.select({ ios: 50, android: 80, web: 0 }) ?? 0;
+export const MaxContentWidth = 840;

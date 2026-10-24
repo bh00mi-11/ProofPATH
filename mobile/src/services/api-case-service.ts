@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import type { CaseService } from './case-service';
+import type { ICaseService } from './case-service';
 import type {
   Claim,
   DisclosurePreview,
@@ -9,6 +9,15 @@ import type {
   RecipientType,
   ScenarioResult,
 } from '@/types/proofpath.types';
+
+function normalizeEvidenceType(typeStr?: string): Evidence['type'] {
+  const t = (typeStr || '').toLowerCase();
+  if (t.includes('image') || t === 'jpg' || t === 'png' || t === 'jpeg') return 'image';
+  if (t.includes('transcript') || t.includes('audio')) return 'transcript';
+  if (t.includes('url') || t.includes('link') || t.includes('web')) return 'url';
+  if (t.includes('session')) return 'session';
+  return 'document';
+}
 
 function resolveDefaultApiBase(): string {
   if (process.env.EXPO_PUBLIC_API_BASE_URL) {
@@ -114,7 +123,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 }
 
-export const apiCaseService: CaseService = {
+export const apiCaseService: ICaseService & {
+  getCases: () => Promise<IncidentCase[]>;
+  getFullCase: (caseId?: string) => Promise<{ case: IncidentCase; artifacts: Evidence[]; observations: Observation[]; claims: Claim[] }>;
+  createCase: (title: string, description?: string) => Promise<IncidentCase>;
+  uploadEvidence: (caseId: string, file: { uri: string; name: string; type: string }) => Promise<Evidence>;
+  runScenario: (caseId: string, excludedEvidenceIds: string[]) => Promise<ScenarioResult>;
+  exportPdf: (caseId: string, recipient: RecipientType, confirmedConfig: boolean, redactedTerms?: string[]) => Promise<Blob>;
+} = {
   async getCases(): Promise<IncidentCase[]> {
     const data = await request<{ cases: Array<{ id: string; title: string; description?: string; created_at?: string }> }>('/api/cases');
     return (data.cases || []).map((c) => ({
@@ -125,7 +141,7 @@ export const apiCaseService: CaseService = {
     }));
   },
 
-  async getCase(caseId: string) {
+  async getFullCase(caseId: string = 'case_demo_01') {
     const data = await request<BackendCaseResponse>(`/api/cases/${encodeURIComponent(caseId)}`);
 
     const incident: IncidentCase = {
@@ -139,11 +155,9 @@ export const apiCaseService: CaseService = {
       id: a.id,
       caseId: a.case_id,
       name: a.filename,
-      type: a.file_type || 'document',
+      type: normalizeEvidenceType(a.file_type),
       ingestedAt: a.ingested_at || new Date().toISOString(),
       integrity: 'MATCH',
-      sha256: a.sha256,
-      fileSize: a.file_size,
     }));
 
     const observations: Observation[] = (data.observations || []).map((o) => ({
@@ -151,9 +165,6 @@ export const apiCaseService: CaseService = {
       evidenceId: o.artifact_id || 'manual_entry',
       text: `${o.field}: ${o.value} (${o.source_type})`,
       recordedAt: o.created_at || new Date().toISOString(),
-      field: o.field,
-      value: o.value,
-      sourceType: o.source_type,
     }));
 
     const claims: Claim[] = (data.claims || []).map((c) => ({
@@ -163,8 +174,6 @@ export const apiCaseService: CaseService = {
       supportingObservationIds: c.supporting_observations || [],
       conflictingObservationIds: c.contradicting_observations || [],
       explanation: c.reason || '',
-      category: c.category,
-      incidentTime: c.incident_time,
     }));
 
     return {
@@ -175,19 +184,36 @@ export const apiCaseService: CaseService = {
     };
   },
 
-  async getEvidence(caseId: string): Promise<Evidence[]> {
-    const res = await this.getCase(caseId);
+  async getCase(caseId: string = 'case_demo_01'): Promise<IncidentCase | null> {
+    try {
+      const full = await this.getFullCase(caseId);
+      return full.case;
+    } catch {
+      return null;
+    }
+  },
+
+  async getEvidence(caseId: string = 'case_demo_01'): Promise<Evidence[]> {
+    const res = await this.getFullCase(caseId);
     return res.artifacts;
   },
 
-  async getObservations(caseId: string): Promise<Observation[]> {
-    const res = await this.getCase(caseId);
+  async getObservations(caseId: string = 'case_demo_01'): Promise<Observation[]> {
+    const res = await this.getFullCase(caseId);
     return res.observations;
   },
 
-  async getClaims(caseId: string): Promise<Claim[]> {
-    const res = await this.getCase(caseId);
+  async getClaims(caseId: string = 'case_demo_01'): Promise<Claim[]> {
+    const res = await this.getFullCase(caseId);
     return res.claims;
+  },
+
+  async getPreparedScenarioResult(): Promise<ScenarioResult> {
+    return this.runTimeMachineScenario(['ev-01']);
+  },
+
+  async runTimeMachineScenario(excludedEvidenceIds: string[]): Promise<ScenarioResult> {
+    return this.runScenario('case_demo_01', excludedEvidenceIds);
   },
 
   async createCase(title: string, description: string = ''): Promise<IncidentCase> {
@@ -220,11 +246,9 @@ export const apiCaseService: CaseService = {
       id: data.artifact.artifact_id,
       caseId,
       name: data.artifact.filename,
-      type: data.artifact.file_type,
+      type: normalizeEvidenceType(data.artifact.file_type),
       ingestedAt: new Date().toISOString(),
       integrity: 'MATCH',
-      sha256: data.artifact.sha256,
-      fileSize: data.artifact.file_size,
     };
   },
 
@@ -296,8 +320,6 @@ export const apiCaseService: CaseService = {
       scenarioId: `sim_${caseId}_${Date.now()}`,
       excludedEvidenceIds,
       changes,
-      claims,
-      affectedClaimsCount: res.affected_claims_count,
     };
   },
 
@@ -334,8 +356,6 @@ export const apiCaseService: CaseService = {
       excludedFields: p.excluded_fields,
       warnings: p.warnings,
       canExport: true,
-      disclaimer: p.disclaimer,
-      includedClaimsCount: p.included_claims_count,
     };
   },
 
