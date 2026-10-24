@@ -73,6 +73,10 @@ class WhatIfOverride(BaseModel):
     disputed: bool = False
     reason: Optional[str] = None
 
+class CaseCreateRequest(BaseModel):
+    title: str
+    description: Optional[str] = ""
+
 class ScenarioSimulationRequest(BaseModel):
     case_id: str
     scenario_name: Optional[str] = "Simulation Scenario"
@@ -113,6 +117,34 @@ def reset_and_seed():
     try:
         case_id = seed_demo_fixture(conn, vault)
         return {"status": "success", "case_id": case_id, "message": "Demo fixture re-seeded"}
+    finally:
+        conn.close()
+
+@app.get("/api/cases")
+def list_cases():
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM cases ORDER BY created_at DESC")
+        cases = [dict(r) for r in cur.fetchall()]
+        return {"cases": cases}
+    finally:
+        conn.close()
+
+@app.post("/api/cases")
+def create_case(req: CaseCreateRequest):
+    if not req.title.strip():
+        raise HTTPException(status_code=400, detail="Title cannot be empty")
+    import uuid
+    case_id = f"case_{uuid.uuid4().hex[:8]}"
+    conn = get_connection()
+    try:
+        with conn:
+            conn.execute(
+                "INSERT INTO cases (id, title, description) VALUES (?, ?, ?)",
+                (case_id, req.title.strip(), (req.description or "").strip())
+            )
+        return {"status": "success", "case": {"id": case_id, "title": req.title.strip(), "description": (req.description or "").strip()}}
     finally:
         conn.close()
 
