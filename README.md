@@ -2,7 +2,6 @@
 
 > **From fragmented digital evidence to a traceable, privacy-reviewed incident record.**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688.svg)](https://fastapi.tiangolo.com/)
 [![React Native](https://img.shields.io/badge/React%20Native-0.74%2B-61DAFB.svg)](https://reactnative.dev/)
