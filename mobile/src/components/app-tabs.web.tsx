@@ -1,99 +1,76 @@
-import {
-  Tabs,
-  TabList,
-  TabTrigger,
-  TabSlot,
-  TabTriggerSlotProps,
-  TabListProps,
-} from 'expo-router/ui';
-import { Pressable, View, StyleSheet, useColorScheme } from 'react-native';
+import { Link, Slot, usePathname, type Href } from 'expo-router';
+import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 import { BrandColors, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { ThemedText } from './themed-text';
-import { ThemedView } from '@/components/themed-view';
+
+const navItems: { label: string; href: Href; path: string }[] = [
+  { label: 'Home', href: '/', path: '/' },
+  { label: 'Evidence timeline', href: '/evidence', path: '/evidence' },
+  { label: 'What if removed?', href: '/time-machine', path: '/time-machine' },
+  { label: 'Choose what to share', href: '/privacy', path: '/privacy' },
+];
 
 export default function AppTabs() {
-  return (
-    <Tabs style={styles.webRoot}>
-      {/* Top Navigation Bar: rendered in normal document flow so it never overlaps the page title */}
-      <TabList asChild>
-        <CustomTabList>
-          <TabTrigger name="index" href="/" asChild>
-            <TabButton>Home</TabButton>
-          </TabTrigger>
-          <TabTrigger name="evidence" href="/evidence" asChild>
-            <TabButton>Evidence timeline</TabButton>
-          </TabTrigger>
-          <TabTrigger name="time-machine" href="/time-machine" asChild>
-            <TabButton>What if removed?</TabButton>
-          </TabTrigger>
-          <TabTrigger name="privacy" href="/privacy" asChild>
-            <TabButton>Choose what to share</TabButton>
-          </TabTrigger>
-        </CustomTabList>
-      </TabList>
-
-      {/* Main Screen Content: starts cleanly below the top navigation bar */}
-      <View style={styles.slotWrapper}>
-        <TabSlot style={styles.slot} />
-      </View>
-    </Tabs>
-  );
-}
-
-export function TabButton({
-  children,
-  isFocused,
-  ref: _ref,
-  ...props
-}: TabTriggerSlotProps) {
-  return (
-    <Pressable {...props} style={({ pressed }) => [styles.tabPressable, pressed && styles.pressed]}>
-      <View
-        style={[
-          styles.tabButtonView,
-          isFocused ? styles.tabButtonActive : styles.tabButtonInactive,
-        ]}>
-        <ThemedText
-          type="smallBold"
-          style={isFocused ? styles.tabTextActive : styles.tabTextInactive}>
-          {children}
-        </ThemedText>
-      </View>
-    </Pressable>
-  );
-}
-
-export function CustomTabList(props: TabListProps) {
+  const pathname = usePathname();
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
   const colors = Colors[isDark ? 'dark' : 'light'];
 
   return (
-    <View
-      {...props}
-      style={[
-        styles.topBar,
-        {
-          backgroundColor: colors.backgroundElement,
-          borderBottomColor: isDark ? BrandColors.borderDark : BrandColors.border,
-        },
-      ]}>
-      <View style={styles.innerContainer}>
-        {/* Brand Logo & Name */}
-        <View style={styles.brandRow}>
-          <View style={styles.brandIcon}>
-            <ThemedText style={styles.brandIconText}>✦</ThemedText>
-          </View>
-          <ThemedText type="smallBold" style={styles.brandName}>
-            ProofPath
-          </ThemedText>
-        </View>
+    <View style={styles.webRoot}>
+      {/* Top Navigation Bar: rendered in normal document flow so it never overlaps the page title */}
+      <View
+        style={[
+          styles.topBar,
+          {
+            backgroundColor: colors.backgroundElement,
+            borderBottomColor: isDark ? BrandColors.borderDark : BrandColors.border,
+          },
+        ]}>
+        <View style={styles.innerContainer}>
+          {/* Brand Logo & Name */}
+          <Link href="/" asChild>
+            <Pressable style={styles.brandRow}>
+              <View style={styles.brandIcon}>
+                <ThemedText style={styles.brandIconText}>✦</ThemedText>
+              </View>
+              <ThemedText type="smallBold" style={styles.brandName}>
+                ProofPath
+              </ThemedText>
+            </Pressable>
+          </Link>
 
-        {/* Tab navigation links */}
-        <View style={styles.tabLinksRow}>
-          {props.children}
+          {/* Tab navigation links */}
+          <View style={styles.tabLinksRow}>
+            {navItems.map((item) => {
+              const active = pathname === item.path || (item.path === '/' && pathname === '/index');
+              return (
+                <Link key={item.label} href={item.href} asChild>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.tabButtonView,
+                      active ? styles.tabButtonActive : styles.tabButtonInactive,
+                      pressed && styles.pressed,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.tabTextBase,
+                        active ? styles.tabTextActive : styles.tabTextInactive,
+                      ]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                </Link>
+              );
+            })}
+          </View>
         </View>
+      </View>
+
+      {/* Main Screen Content */}
+      <View style={styles.slotWrapper}>
+        <Slot />
       </View>
     </View>
   );
@@ -109,7 +86,6 @@ const styles = StyleSheet.create({
     width: '100%',
     borderBottomWidth: 1,
     zIndex: 50,
-    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
   },
   innerContainer: {
     maxWidth: MaxContentWidth,
@@ -165,6 +141,10 @@ const styles = StyleSheet.create({
   },
   tabButtonInactive: {
     backgroundColor: 'transparent',
+  },
+  tabTextBase: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   tabTextActive: {
     color: BrandColors.indigo,
