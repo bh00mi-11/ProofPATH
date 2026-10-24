@@ -191,7 +191,7 @@ export function EvidenceTimelineCard({
             <ThemedText
               type="smallBold"
               style={isExcluded ? styles.reincludeButtonText : styles.excludeButtonText}>
-              {isExcluded ? '✓ Put back in test' : '− Remove from test'}
+              {isExcluded ? '✓ Put back in review' : '− See what changes without this evidence'}
             </ThemedText>
           </Pressable>
         )}
@@ -202,7 +202,7 @@ export function EvidenceTimelineCard({
             style={styles.expandHeader}
             onPress={() => setIsExpanded((prev) => !prev)}>
             <ThemedText type="smallBold" style={styles.expandLabel}>
-              {isExpanded ? '▼ Facts & Observations' : '▶ Show Facts & Observations'} ({observations.length})
+              {isExpanded ? '▼ Recorded Details' : '▶ Show Recorded Details'} ({observations.length})
             </ThemedText>
           </Pressable>
 
@@ -212,7 +212,7 @@ export function EvidenceTimelineCard({
                 style={styles.smallActionPill}
                 onPress={() => onReviewFacts(evidence)}
               >
-                <ThemedText style={styles.smallActionPillText}>⚡ Extract Facts</ThemedText>
+                <ThemedText style={styles.smallActionPillText}>⚡ Review Details</ThemedText>
               </Pressable>
             ) : null}
             {onAddObservation ? (
@@ -220,7 +220,7 @@ export function EvidenceTimelineCard({
                 style={styles.smallActionPillSecondary}
                 onPress={() => onAddObservation(evidence)}
               >
-                <ThemedText style={styles.smallActionPillSecondaryText}>+ Add Fact</ThemedText>
+                <ThemedText style={styles.smallActionPillSecondaryText}>+ Add Detail</ThemedText>
               </Pressable>
             ) : null}
           </View>
@@ -232,10 +232,10 @@ export function EvidenceTimelineCard({
             {observations.length === 0 ? (
               <View style={styles.emptyObsNotice}>
                 <ThemedText type="small" style={styles.dimText}>
-                  No factual observations linked to this evidence artifact yet.
+                  No recorded details saved for this evidence yet.
                 </ThemedText>
                 <ThemedText type="small" style={styles.emptyObsHint}>
-                  Extract structured facts or add observations to evaluate claims in Trace Engine and Time Machine.
+                  Tap "Review Details" to find dates, messages, or senders, or tap "+ Add Detail" to enter one manually.
                 </ThemedText>
               </View>
             ) : (
@@ -291,7 +291,7 @@ export function EvidenceTimelineCard({
                       </View>
                     )}
 
-                    {/* Link to Claim controls */}
+                    {/* Link to Statement controls */}
                     {claims.length > 0 && onLinkObservationToClaim && (
                       <View style={styles.linkingBar}>
                         <Pressable
@@ -299,14 +299,14 @@ export function EvidenceTimelineCard({
                           onPress={() => setLinkingObsId(isLinkingThis ? null : obs.id)}
                         >
                           <ThemedText style={styles.toggleLinkRowBtnText}>
-                            {isLinkingThis ? '▲ Close claim linking' : '🔗 Link to a claim...'}
+                            {isLinkingThis ? '▲ Close statement linking' : '🔗 Connect to a statement...'}
                           </ThemedText>
                         </Pressable>
 
                         {isLinkingThis && (
                           <View style={styles.claimSelectionDrawer}>
                             <ThemedText type="smallBold" style={styles.drawerTitle}>
-                              Link Fact #{obs.id} to Claim:
+                              Connect Detail #{obs.id} to Statement:
                             </ThemedText>
                             {claims.map((clm) => (
                               <View key={clm.id} style={styles.claimOptionItem}>
@@ -321,7 +321,7 @@ export function EvidenceTimelineCard({
                                       setLinkingObsId(null);
                                     }}
                                   >
-                                    <ThemedText style={styles.relButtonSupportText}>+ Supports</ThemedText>
+                                    <ThemedText style={styles.relButtonSupportText}>✓ Supports</ThemedText>
                                   </Pressable>
                                   <Pressable
                                     style={styles.relButtonConflict}
@@ -330,7 +330,7 @@ export function EvidenceTimelineCard({
                                       setLinkingObsId(null);
                                     }}
                                   >
-                                    <ThemedText style={styles.relButtonConflictText}>✕ Contradicts</ThemedText>
+                                    <ThemedText style={styles.relButtonConflictText}>✕ Doesn't match</ThemedText>
                                   </Pressable>
                                 </View>
                               </View>

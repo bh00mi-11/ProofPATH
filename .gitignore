@@ -35,3 +35,8 @@ backend/tests/test_data/
 # Environment
 .env
 .venv
+
+# Generated synthetic test artifacts and PDFs
+test_output.pdf
+synthetic_evidence/
+

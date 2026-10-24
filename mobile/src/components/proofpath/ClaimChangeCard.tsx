@@ -19,15 +19,15 @@ export function ClaimChangeCard({ change, claimStatement }: ClaimChangeCardProps
       <View style={styles.headerRow}>
         <View style={styles.simulatedBadge}>
           <ThemedText type="smallBold" style={styles.simulatedTag}>
-            Example simulation result
+            Simulation Result
           </ThemedText>
         </View>
         <ThemedText type="small" style={styles.claimIdText}>
-          Claim #{change.claimId}
+          Statement #{change.claimId}
         </ThemedText>
       </View>
 
-      {/* Claim Statement if available */}
+      {/* Statement if available */}
       {claimStatement && (
         <ThemedText type="default" style={styles.statementText}>
           "{claimStatement}"
@@ -38,7 +38,7 @@ export function ClaimChangeCard({ change, claimStatement }: ClaimChangeCardProps
       <View style={styles.transitionRow}>
         <View style={styles.statusColumn}>
           <ThemedText type="small" style={styles.transitionLabel}>
-            Before
+            Original assessment
           </ThemedText>
           <ClaimStatusBadge status={change.before} />
         </View>
@@ -49,7 +49,7 @@ export function ClaimChangeCard({ change, claimStatement }: ClaimChangeCardProps
 
         <View style={styles.statusColumn}>
           <ThemedText type="small" style={styles.transitionLabel}>
-            After
+            Without this evidence
           </ThemedText>
           <ClaimStatusBadge status={change.after} />
         </View>
@@ -61,7 +61,7 @@ export function ClaimChangeCard({ change, claimStatement }: ClaimChangeCardProps
           Why this changed:
         </ThemedText>
         <ThemedText type="small" style={styles.reasonText}>
-          {change.reason}
+          {change.reason.replace(/observation\(s\)/gi, 'recorded detail(s)').replace(/claim\(s\)/gi, 'statement(s)')}
         </ThemedText>
       </View>
     </ThemedView>

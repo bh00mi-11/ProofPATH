@@ -61,8 +61,12 @@ export default function EvidenceScreen() {
   const [isLoadingProposals, setIsLoadingProposals] = useState(false);
   const [proposals, setProposals] = useState<ObservationProposal[]>([]);
   const [proposalTargets, setProposalTargets] = useState<{ [index: number]: { claimId: string; relation: 'SUPPORTS' | 'CONTRADICTS' | 'CONTEXT' } }>({});
+  const [editingProposalIdx, setEditingProposalIdx] = useState<number | null>(null);
+  const [editingValue, setEditingValue] = useState<string>('');
   const [proposalError, setProposalError] = useState<string | null>(null);
   const [proposalSuccess, setProposalSuccess] = useState<string | null>(null);
+  const [savedCount, setSavedCount] = useState(0);
+  const [allSavedNotice, setAllSavedNotice] = useState(false);
 
   // Add Manual Fact modal state
   const [manualFactModalVisible, setManualFactModalVisible] = useState(false);
@@ -73,6 +77,7 @@ export default function EvidenceScreen() {
   const [manualRelation, setManualRelation] = useState<'SUPPORTS' | 'CONTRADICTS' | 'CONTEXT'>('SUPPORTS');
   const [isSavingManualFact, setIsSavingManualFact] = useState(false);
   const [manualFactError, setManualFactError] = useState<string | null>(null);
+  const [manualFactSuccess, setManualFactSuccess] = useState(false);
 
   const caseId = currentCase?.id || 'case_demo_01';
 
@@ -120,11 +125,19 @@ export default function EvidenceScreen() {
       };
 
       const uploaded = await uploadEvidenceToCase(caseId, fileObj);
-      setUploadSuccess(`Successfully uploaded ${uploaded.name} to vault!`);
+      setUploadSuccess(`Successfully saved ${uploaded.name}!`);
       setTimeout(() => {
         setUploadSuccess(null);
         setModalVisible(false);
-      }, 1500);
+        // Immediately show "Review details from this evidence" within the same flow
+        const ext = uploaded.name.split('.').pop()?.toLowerCase();
+        if (ext === 'txt' || ext === 'csv') {
+          handleOpenReviewFacts(uploaded);
+        } else {
+          // If extraction is unsupported (e.g. PDF/image/unsupported), open manual entry with clear explanation
+          handleOpenAddObservation(uploaded);
+        }
+      }, 700);
     } catch (err: any) {
       const msg = typeof err === 'string' ? err : err?.message || (err?.detail ? JSON.stringify(err.detail) : 'Failed to pick or upload document');
       setUploadError(msg);
@@ -164,11 +177,13 @@ export default function EvidenceScreen() {
       };
 
       const uploaded = await uploadEvidenceToCase(caseId, fileObj);
-      setUploadSuccess(`Successfully ingested image ${uploaded.name}!`);
+      setUploadSuccess(`Successfully saved ${uploaded.name}!`);
       setTimeout(() => {
         setUploadSuccess(null);
         setModalVisible(false);
-      }, 1500);
+        // Automatic text extraction does not run on image binaries; immediately offer manual detail review
+        handleOpenAddObservation(uploaded);
+      }, 700);
     } catch (err: any) {
       const msg = typeof err === 'string' ? err : err?.message || (err?.detail ? JSON.stringify(err.detail) : 'Failed to select or upload image');
       setUploadError(msg);
@@ -206,26 +221,15 @@ export default function EvidenceScreen() {
       }
 
       const uploaded = await uploadEvidenceToCase(caseId, fileObj);
-
-      // Auto-extract first observation from text note
-      try {
-        await addObservationToCase(
-          caseId,
-          'Statement Excerpt',
-          textContent.trim().slice(0, 160),
-          uploaded.id
-        );
-      } catch {
-        // Non-blocking observation attachment
-      }
-
       setUploadSuccess(`Text file "${filename}" recorded and hashed!`);
       setTextContent('');
       setTextFileName('');
       setTimeout(() => {
         setUploadSuccess(null);
         setModalVisible(false);
-      }, 1500);
+        // Immediately offer review workflow for the newly created text evidence
+        handleOpenReviewFacts(uploaded);
+      }, 700);
     } catch (err: any) {
       const msg = typeof err === 'string' ? err : err?.message || (err?.detail ? JSON.stringify(err.detail) : 'Failed to upload text file');
       setUploadError(msg);
@@ -239,8 +243,12 @@ export default function EvidenceScreen() {
     setSelectedArtifactForReview(art);
     setProposals([]);
     setProposalTargets({});
+    setEditingProposalIdx(null);
+    setEditingValue('');
     setProposalError(null);
     setProposalSuccess(null);
+    setSavedCount(0);
+    setAllSavedNotice(false);
     setReviewModalVisible(true);
     setIsLoadingProposals(true);
 
@@ -260,7 +268,7 @@ export default function EvidenceScreen() {
       });
       setProposalTargets(initialTargets);
     } catch (err: any) {
-      setProposalError(err?.message || 'Failed to extract facts from document.');
+      setProposalError(err?.message || 'Failed to extract details from document.');
     } finally {
       setIsLoadingProposals(false);
     }
@@ -269,27 +277,34 @@ export default function EvidenceScreen() {
   const handleSaveProposal = async (prop: ObservationProposal, idx: number) => {
     if (!selectedArtifactForReview) return;
     const targetCaseId = selectedArtifactForReview.caseId || caseId;
+    const finalVal = editingProposalIdx === idx && editingValue.trim() ? editingValue.trim() : prop.value;
     try {
       setProposalError(null);
       // Create observation
       const obs = await addObservationToCase(
         targetCaseId,
         prop.field,
-        prop.value,
+        finalVal,
         selectedArtifactForReview.id
       );
-      // If a claim is selected, link it
+      // If a statement is selected, link it
       const target = proposalTargets[idx];
       if (target && target.claimId) {
         await linkClaimObservation(targetCaseId, target.claimId, obs.id, target.relation);
       }
-      setProposalSuccess(`Saved Fact #${obs.id} (${prop.field})`);
+      setProposalSuccess(`Saved detail: "${finalVal.slice(0, 40)}"`);
       await refreshData();
+      setSavedCount((c) => c + 1);
       // Remove the proposal from the list once saved
-      setProposals((prev) => prev.filter((_, i) => i !== idx));
-      setTimeout(() => setProposalSuccess(null), 2000);
+      const remaining = proposals.filter((_, i) => i !== idx);
+      setProposals(remaining);
+      setEditingProposalIdx(null);
+      setEditingValue('');
+      if (remaining.length === 0) {
+        setAllSavedNotice(true);
+      }
     } catch (err: any) {
-      setProposalError(err?.message || 'Failed to save observation.');
+      setProposalError(err?.message || 'Failed to save detail.');
     }
   };
 
@@ -301,13 +316,14 @@ export default function EvidenceScreen() {
     setManualClaimId(claims.length > 0 ? claims[0].id : '');
     setManualRelation('SUPPORTS');
     setManualFactError(null);
+    setManualFactSuccess(false);
     setManualFactModalVisible(true);
   };
 
   const handleSaveManualFact = async () => {
     if (!targetArtifactForManual) return;
     if (!manualValue.trim()) {
-      setManualFactError('Please enter a factual value or observation text.');
+      setManualFactError('Please enter a detail value or observation text.');
       return;
     }
     setIsSavingManualFact(true);
@@ -323,9 +339,9 @@ export default function EvidenceScreen() {
         await linkClaimObservation(caseId, manualClaimId, obs.id, manualRelation);
       }
       await refreshData();
-      setManualFactModalVisible(false);
+      setManualFactSuccess(true);
     } catch (err: any) {
-      setManualFactError(err?.message || 'Failed to record fact.');
+      setManualFactError(err?.message || 'Failed to record detail.');
     } finally {
       setIsSavingManualFact(false);
     }
@@ -757,10 +773,10 @@ export default function EvidenceScreen() {
               <View style={styles.modalHeader}>
                 <View style={{ flex: 1 }}>
                   <ThemedText type="subtitle" style={styles.modalTitle}>
-                    ⚡ Review Extracted Facts
+                    ⚡ Review What Happened
                   </ThemedText>
                   <ThemedText type="small" style={styles.modalSubtitle}>
-                    Source: {selectedArtifactForReview?.name} (SHA-256 Verified)
+                    Evidence: {selectedArtifactForReview?.name} (Verified tamper-free)
                   </ThemedText>
                 </View>
                 <Pressable
@@ -791,58 +807,93 @@ export default function EvidenceScreen() {
                 <View style={styles.loadingProposalsArea}>
                   <ActivityIndicator size="large" color={BrandColors.indigo} />
                   <ThemedText type="smallBold" style={styles.loadingProposalsText}>
-                    Analyzing document text deterministically...
+                    Reading dates and text details from this evidence...
                   </ThemedText>
                 </View>
-              ) : proposals.length === 0 ? (
-                <View style={styles.emptyProposalsArea}>
-                  <ThemedText style={styles.emptyProposalsTitle}>No structured facts found</ThemedText>
-                  <ThemedText type="small" style={styles.emptyProposalsSub}>
-                    The file text did not contain obvious dates or sender labels. You can record facts manually using "+ Add Fact".
+              ) : allSavedNotice || proposals.length === 0 ? (
+                <View style={styles.completedReviewCard}>
+                  <ThemedText style={styles.completedReviewIcon}>✓</ThemedText>
+                  <ThemedText type="subtitle" style={styles.completedReviewTitle}>
+                    Your evidence has been added to your record.
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.completedReviewDesc}>
+                    {savedCount > 0
+                      ? `${savedCount} detail(s) have been verified and securely connected to your case timeline.`
+                      : 'This evidence file is safely registered in your private vault.'}
                   </ThemedText>
                   <Pressable
-                    style={styles.switchManualBtn}
+                    style={styles.reviewRecordPrimaryBtn}
                     onPress={() => {
                       setReviewModalVisible(false);
-                      if (selectedArtifactForReview) {
-                        handleOpenAddObservation(selectedArtifactForReview);
-                      }
+                      router.push(`/incident/${caseId}` as any);
                     }}
                   >
-                    <ThemedText style={styles.switchManualBtnText}>+ Add Fact Manually</ThemedText>
+                    <ThemedText style={styles.reviewRecordPrimaryBtnText}>
+                      Review my record →
+                    </ThemedText>
                   </Pressable>
                 </View>
               ) : (
                 <ScrollView style={styles.proposalsScroll} showsVerticalScrollIndicator={true}>
                   <ThemedText type="small" style={styles.reviewInstructionNotice}>
-                    Review facts extracted from the document before saving to the Case record. Choose which claim each fact supports or contradicts.
+                    Review details found in this evidence below. You can confirm, edit, or connect each detail to a statement. ProofPath never automatically asserts extracted text as true without your review.
                   </ThemedText>
 
                   {proposals.map((prop, idx) => {
                     const currentTarget = proposalTargets[idx] || { claimId: claims[0]?.id || '', relation: 'SUPPORTS' };
+                    const isEditing = editingProposalIdx === idx;
                     return (
                       <View key={`${prop.field}_${idx}`} style={styles.proposalItemCard}>
                         <View style={styles.proposalTopRow}>
                           <View style={styles.proposalBadge}>
-                            <ThemedText style={styles.proposalBadgeText}>{prop.field.toUpperCase()}</ThemedText>
+                            <ThemedText style={styles.proposalBadgeText}>{prop.field.replace('_', ' ').toUpperCase()}</ThemedText>
                           </View>
+                          <Pressable
+                            onPress={() => {
+                              if (isEditing) {
+                                setEditingProposalIdx(null);
+                              } else {
+                                setEditingProposalIdx(idx);
+                                setEditingValue(prop.value);
+                              }
+                            }}
+                            style={styles.editDetailBtn}
+                          >
+                            <ThemedText style={styles.editDetailBtnText}>
+                              {isEditing ? 'Cancel Edit' : '✏ Edit text'}
+                            </ThemedText>
+                          </Pressable>
                         </View>
 
-                        <ThemedText style={styles.proposalValueText}>
-                          "{prop.value}"
-                        </ThemedText>
+                        {isEditing ? (
+                          <View style={styles.editDetailInputBox}>
+                            <TextInput
+                              style={styles.editDetailInput}
+                              value={editingValue}
+                              onChangeText={setEditingValue}
+                              multiline
+                            />
+                            <ThemedText type="small" style={styles.editHintText}>
+                              Adjust wording or timestamp if needed before saving.
+                            </ThemedText>
+                          </View>
+                        ) : (
+                          <ThemedText style={styles.proposalValueText}>
+                            "{prop.value}"
+                          </ThemedText>
+                        )}
 
                         {prop.excerpt ? (
                           <ThemedText type="small" style={styles.proposalExcerpt}>
-                            Source excerpt: {prop.excerpt}
+                            Found in text: "{prop.excerpt}"
                           </ThemedText>
                         ) : null}
 
-                        {/* Claim selector & relation */}
+                        {/* Statement selector & relation */}
                         {claims.length > 0 && (
                           <View style={styles.proposalTargetBox}>
                             <ThemedText type="smallBold" style={styles.targetBoxLabel}>
-                              Target Claim:
+                              CONNECT TO A STATEMENT:
                             </ThemedText>
                             <View style={styles.claimsPillsRow}>
                               {claims.map((clm) => {
@@ -869,36 +920,51 @@ export default function EvidenceScreen() {
                               })}
                             </View>
 
-                            <ThemedText type="smallBold" style={[styles.targetBoxLabel, { marginTop: 6 }]}>
-                              Relation:
+                            <ThemedText type="smallBold" style={[styles.targetBoxLabel, { marginTop: 8 }]}>
+                              HOW DOES THIS DETAIL RELATE?
                             </ThemedText>
-                            <View style={styles.relationPillsRow}>
-                              {(['SUPPORTS', 'CONTRADICTS', 'CONTEXT'] as const).map((rel) => {
-                                const isRelSelected = currentTarget.relation === rel;
+                            <View style={styles.relationPillsCol}>
+                              {(
+                                [
+                                  { rel: 'SUPPORTS', label: '✓ Supports this statement', desc: 'Confirms that this statement occurred' },
+                                  { rel: 'CONTRADICTS', label: "✕ Doesn't match this statement", desc: 'Shows a different date, sender, or story that clashes' },
+                                  { rel: 'CONTEXT', label: 'ℹ Adds background information', desc: 'Helpful context that does not prove or disprove' },
+                                ] as const
+                              ).map((item) => {
+                                const isRelSelected = currentTarget.relation === item.rel;
                                 return (
                                   <Pressable
-                                    key={rel}
+                                    key={item.rel}
                                     style={[
-                                      styles.relPill,
-                                      rel === 'SUPPORTS' && isRelSelected && styles.relPillSupportActive,
-                                      rel === 'CONTRADICTS' && isRelSelected && styles.relPillConflictActive,
-                                      rel === 'CONTEXT' && isRelSelected && styles.relPillContextActive,
+                                      styles.relChoiceRow,
+                                      isRelSelected && styles.relChoiceRowActive,
+                                      item.rel === 'SUPPORTS' && isRelSelected && styles.relChoiceRowSupport,
+                                      item.rel === 'CONTRADICTS' && isRelSelected && styles.relChoiceRowConflict,
+                                      item.rel === 'CONTEXT' && isRelSelected && styles.relChoiceRowContext,
                                     ]}
                                     onPress={() =>
                                       setProposalTargets((prev) => ({
                                         ...prev,
-                                        [idx]: { ...currentTarget, relation: rel },
+                                        [idx]: { ...currentTarget, relation: item.rel },
                                       }))
                                     }
                                   >
-                                    <ThemedText
-                                      style={[
-                                        styles.relPillText,
-                                        isRelSelected && styles.relPillTextSelected,
-                                      ]}
-                                    >
-                                      {rel === 'SUPPORTS' ? '✓ Supports' : rel === 'CONTRADICTS' ? '✕ Contradicts' : 'ℹ Context'}
-                                    </ThemedText>
+                                    <View style={styles.relRadioCircle}>
+                                      {isRelSelected ? <View style={styles.relRadioDot} /> : null}
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                      <ThemedText
+                                        style={[
+                                          styles.relChoiceLabel,
+                                          isRelSelected && styles.relChoiceLabelActive,
+                                        ]}
+                                      >
+                                        {item.label}
+                                      </ThemedText>
+                                      <ThemedText type="small" style={styles.relChoiceDesc}>
+                                        {item.desc}
+                                      </ThemedText>
+                                    </View>
                                   </Pressable>
                                 );
                               })}
@@ -911,7 +977,7 @@ export default function EvidenceScreen() {
                           onPress={() => handleSaveProposal(prop, idx)}
                         >
                           <ThemedText style={styles.saveProposalBtnText}>
-                            Save & Link Fact →
+                            Save detail to record →
                           </ThemedText>
                         </Pressable>
                       </View>
@@ -935,7 +1001,7 @@ export default function EvidenceScreen() {
               <View style={styles.modalHeader}>
                 <View style={{ flex: 1 }}>
                   <ThemedText type="subtitle" style={styles.modalTitle}>
-                    + Add Factual Observation
+                    📝 Review & Record Detail
                   </ThemedText>
                   <ThemedText type="small" style={styles.modalSubtitle}>
                     Evidence: {targetArtifactForManual?.name}
@@ -949,6 +1015,16 @@ export default function EvidenceScreen() {
                 </Pressable>
               </View>
 
+              {/* Extraction explanation banner */}
+              <View style={styles.unsupportedExtractionNotice}>
+                <ThemedText type="smallBold" style={styles.unsupportedExtractionTitle}>
+                  ℹ️ Why manual entry?
+                </ThemedText>
+                <ThemedText type="small" style={styles.unsupportedExtractionText}>
+                  Automatic key-value extraction is only supported for plain text (.txt, .csv) logs. For images, PDFs, or photos, ProofPath never guesses or fabricates text. Enter the detail you want recorded from this evidence below.
+                </ThemedText>
+              </View>
+
               {manualFactError ? (
                 <View style={styles.errorNotice}>
                   <ThemedText type="smallBold" style={styles.errorNoticeText}>
@@ -957,116 +1033,159 @@ export default function EvidenceScreen() {
                 </View>
               ) : null}
 
-              <View style={styles.textInputArea}>
-                <ThemedText type="smallBold" style={styles.inputLabel}>
-                  FACT TYPE / FIELD
-                </ThemedText>
-                <View style={styles.fieldPickerRow}>
-                  {[
-                    { label: 'Timestamp / Date', value: 'timestamp' },
-                    { label: 'Sender', value: 'sender' },
-                    { label: 'Message Content', value: 'message_content' },
-                    { label: 'Platform / Origin', value: 'platform' },
-                  ].map((f) => {
-                    const isSelected = manualField === f.value;
-                    return (
-                      <Pressable
-                        key={f.value}
-                        style={[styles.fieldPickerPill, isSelected && styles.fieldPickerPillActive]}
-                        onPress={() => setManualField(f.value)}
-                      >
-                        <ThemedText style={isSelected ? styles.fieldPickerTextActive : styles.fieldPickerText}>
-                          {f.label}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <ThemedText type="smallBold" style={styles.inputLabel}>
-                  FACT VALUE / OBSERVATION TEXT *
-                </ThemedText>
-                <TextInput
-                  style={styles.textArea}
-                  placeholder="e.g. 2026-10-18 10:20 AM or exact text recorded..."
-                  placeholderTextColor={Colors.light.textMuted}
-                  multiline
-                  numberOfLines={3}
-                  value={manualValue}
-                  onChangeText={setManualValue}
-                  editable={!isSavingManualFact}
-                />
-
-                {claims.length > 0 && (
-                  <>
-                    <ThemedText type="smallBold" style={styles.inputLabel}>
-                      LINK TO CLAIM (OPTIONAL)
+              {manualFactSuccess ? (
+                <View style={styles.completedReviewCard}>
+                  <ThemedText style={styles.completedReviewIcon}>✓</ThemedText>
+                  <ThemedText type="subtitle" style={styles.completedReviewTitle}>
+                    Your evidence has been added to your record.
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.completedReviewDesc}>
+                    Detail recorded and linked securely to your case timeline.
+                  </ThemedText>
+                  <Pressable
+                    style={styles.reviewRecordPrimaryBtn}
+                    onPress={() => {
+                      setManualFactModalVisible(false);
+                      router.push(`/incident/${caseId}` as any);
+                    }}
+                  >
+                    <ThemedText style={styles.reviewRecordPrimaryBtnText}>
+                      Review my record →
                     </ThemedText>
-                    <View style={styles.claimsPillsRow}>
-                      {claims.map((clm) => {
-                        const isSelected = manualClaimId === clm.id;
-                        return (
-                          <Pressable
-                            key={clm.id}
-                            style={[styles.claimPill, isSelected && styles.claimPillActive]}
-                            onPress={() => setManualClaimId(isSelected ? '' : clm.id)}
-                          >
-                            <ThemedText
-                              style={isSelected ? styles.claimPillTextActive : styles.claimPillText}
-                              numberOfLines={1}
-                            >
-                              {clm.text}
-                            </ThemedText>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={styles.textInputArea}>
+                  <ThemedText type="smallBold" style={styles.inputLabel}>
+                    DETAIL TYPE / FIELD
+                  </ThemedText>
+                  <View style={styles.fieldPickerRow}>
+                    {[
+                      { label: 'Date / Time', value: 'timestamp' },
+                      { label: 'Sender / Person', value: 'sender' },
+                      { label: 'Message or Action', value: 'message_content' },
+                      { label: 'Platform / App', value: 'platform' },
+                    ].map((f) => {
+                      const isSelected = manualField === f.value;
+                      return (
+                        <Pressable
+                          key={f.value}
+                          style={[styles.fieldPickerPill, isSelected && styles.fieldPickerPillActive]}
+                          onPress={() => setManualField(f.value)}
+                        >
+                          <ThemedText style={isSelected ? styles.fieldPickerTextActive : styles.fieldPickerText}>
+                            {f.label}
+                          </ThemedText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
 
-                    {manualClaimId ? (
-                      <View style={styles.relationPillsRow}>
-                        {(['SUPPORTS', 'CONTRADICTS', 'CONTEXT'] as const).map((rel) => {
-                          const isRelSelected = manualRelation === rel;
+                  <ThemedText type="smallBold" style={styles.inputLabel}>
+                    DETAIL VALUE / WHAT HAPPENED *
+                  </ThemedText>
+                  <TextInput
+                    style={styles.textArea}
+                    placeholder="e.g. 2026-10-18 10:20 AM or exact text recorded in screenshot..."
+                    placeholderTextColor={Colors.light.textMuted}
+                    multiline
+                    numberOfLines={3}
+                    value={manualValue}
+                    onChangeText={setManualValue}
+                    editable={!isSavingManualFact}
+                  />
+
+                  {claims.length > 0 && (
+                    <View style={styles.proposalTargetBox}>
+                      <ThemedText type="smallBold" style={styles.targetBoxLabel}>
+                        CONNECT TO A STATEMENT:
+                      </ThemedText>
+                      <View style={styles.claimsPillsRow}>
+                        {claims.map((clm) => {
+                          const isSelected = manualClaimId === clm.id;
                           return (
                             <Pressable
-                              key={rel}
-                              style={[
-                                styles.relPill,
-                                rel === 'SUPPORTS' && isRelSelected && styles.relPillSupportActive,
-                                rel === 'CONTRADICTS' && isRelSelected && styles.relPillConflictActive,
-                                rel === 'CONTEXT' && isRelSelected && styles.relPillContextActive,
-                              ]}
-                              onPress={() => setManualRelation(rel)}
+                              key={clm.id}
+                              style={[styles.claimPill, isSelected && styles.claimPillActive]}
+                              onPress={() => setManualClaimId(isSelected ? '' : clm.id)}
                             >
                               <ThemedText
-                                style={[
-                                  styles.relPillText,
-                                  isRelSelected && styles.relPillTextSelected,
-                                ]}
+                                style={isSelected ? styles.claimPillTextActive : styles.claimPillText}
+                                numberOfLines={1}
                               >
-                                {rel === 'SUPPORTS' ? '✓ Supports' : rel === 'CONTRADICTS' ? '✕ Contradicts' : 'ℹ Context'}
+                                {clm.text}
                               </ThemedText>
                             </Pressable>
                           );
                         })}
                       </View>
-                    ) : null}
-                  </>
-                )}
 
-                <Pressable
-                  style={[styles.submitTextBtn, isSavingManualFact && styles.disabledBtn]}
-                  onPress={handleSaveManualFact}
-                  disabled={isSavingManualFact}
-                >
-                  {isSavingManualFact ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <ThemedText type="smallBold" style={styles.submitTextBtnLabel}>
-                      Save Fact to Case Record
-                    </ThemedText>
+                      {manualClaimId ? (
+                        <>
+                          <ThemedText type="smallBold" style={[styles.targetBoxLabel, { marginTop: 8 }]}>
+                            HOW DOES THIS DETAIL RELATE?
+                          </ThemedText>
+                          <View style={styles.relationPillsCol}>
+                            {(
+                              [
+                                { rel: 'SUPPORTS', label: '✓ Supports this statement', desc: 'Confirms that this statement occurred' },
+                                { rel: 'CONTRADICTS', label: "✕ Doesn't match this statement", desc: 'Shows a different date, sender, or story that clashes' },
+                                { rel: 'CONTEXT', label: 'ℹ Adds background information', desc: 'Helpful context that does not prove or disprove' },
+                              ] as const
+                            ).map((item) => {
+                              const isRelSelected = manualRelation === item.rel;
+                              return (
+                                <Pressable
+                                  key={item.rel}
+                                  style={[
+                                    styles.relChoiceRow,
+                                    isRelSelected && styles.relChoiceRowActive,
+                                    item.rel === 'SUPPORTS' && isRelSelected && styles.relChoiceRowSupport,
+                                    item.rel === 'CONTRADICTS' && isRelSelected && styles.relChoiceRowConflict,
+                                    item.rel === 'CONTEXT' && isRelSelected && styles.relChoiceRowContext,
+                                  ]}
+                                  onPress={() => setManualRelation(item.rel)}
+                                >
+                                  <View style={styles.relRadioCircle}>
+                                    {isRelSelected ? <View style={styles.relRadioDot} /> : null}
+                                  </View>
+                                  <View style={{ flex: 1 }}>
+                                    <ThemedText
+                                      style={[
+                                        styles.relChoiceLabel,
+                                        isRelSelected && styles.relChoiceLabelActive,
+                                      ]}
+                                    >
+                                      {item.label}
+                                    </ThemedText>
+                                    <ThemedText type="small" style={styles.relChoiceDesc}>
+                                      {item.desc}
+                                    </ThemedText>
+                                  </View>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        </>
+                      ) : null}
+                    </View>
                   )}
-                </Pressable>
-              </View>
+
+                  <Pressable
+                    style={[styles.submitTextBtn, isSavingManualFact && styles.disabledBtn]}
+                    onPress={handleSaveManualFact}
+                    disabled={isSavingManualFact}
+                  >
+                    {isSavingManualFact ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <ThemedText type="smallBold" style={styles.submitTextBtnLabel}>
+                        Save detail to record →
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                </View>
+              )}
             </ThemedView>
           </View>
         </Modal>
@@ -1804,5 +1923,165 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: BrandColors.indigo,
     fontWeight: '700',
+  },
+  relHelpText: {
+    fontSize: 11,
+    color: '#64748B',
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  completedReviewCard: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#86EFAC',
+    padding: 24,
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: 12,
+  },
+  completedReviewIcon: {
+    fontSize: 32,
+    color: '#16A34A',
+    fontWeight: '800',
+    backgroundColor: '#DCFCE7',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    textAlign: 'center',
+    lineHeight: 50,
+  },
+  completedReviewTitle: {
+    color: '#166534',
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  completedReviewDesc: {
+    color: '#15803D',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  reviewRecordPrimaryBtn: {
+    backgroundColor: BrandColors.indigo,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginTop: 6,
+    shadowColor: BrandColors.indigo,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  reviewRecordPrimaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  editDetailBtn: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  editDetailBtnText: {
+    fontSize: 11,
+    color: '#475569',
+    fontWeight: '600',
+  },
+  editDetailInputBox: {
+    gap: 4,
+    marginVertical: 4,
+  },
+  editDetailInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: BrandColors.indigo,
+    borderRadius: 6,
+    padding: 8,
+    fontSize: 13,
+    color: '#0F172A',
+  },
+  editHintText: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  relationPillsCol: {
+    gap: 6,
+    marginTop: 4,
+  },
+  relChoiceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 10,
+  },
+  relChoiceRowActive: {
+    borderWidth: 1.5,
+  },
+  relChoiceRowSupport: {
+    backgroundColor: '#F0FDF4',
+    borderColor: '#22C55E',
+  },
+  relChoiceRowConflict: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#EF4444',
+  },
+  relChoiceRowContext: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#F59E0B',
+  },
+  relRadioCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#94A3B8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  relRadioDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: BrandColors.indigo,
+  },
+  relChoiceLabel: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  relChoiceLabelActive: {
+    color: '#0F172A',
+    fontWeight: '700',
+  },
+  relChoiceDesc: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  unsupportedExtractionNotice: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 8,
+    padding: 10,
+    gap: 4,
+    marginVertical: 6,
+  },
+  unsupportedExtractionTitle: {
+    fontSize: 12,
+    color: '#1D4ED8',
+  },
+  unsupportedExtractionText: {
+    fontSize: 11,
+    color: '#1E40AF',
+    lineHeight: 16,
   },
 });

@@ -83,19 +83,19 @@ export default function IncidentDetailsScreen() {
             <View style={styles.metricRow}>
               <View style={styles.metricBox}>
                 <ThemedText style={styles.metricVal}>{claims.length}</ThemedText>
-                <ThemedText style={styles.metricLbl}>Claims Tracked</ThemedText>
+                <ThemedText style={styles.metricLbl}>Statements</ThemedText>
               </View>
               <View style={styles.metricDivider} />
               <View style={styles.metricBox}>
                 <ThemedText style={styles.metricVal}>{evidence.length}</ThemedText>
-                <ThemedText style={styles.metricLbl}>Attached Artifacts</ThemedText>
+                <ThemedText style={styles.metricLbl}>Evidence Files</ThemedText>
               </View>
               <View style={styles.metricDivider} />
               <View style={styles.metricBox}>
                 <ThemedText style={styles.metricVal}>
                   {claims.filter((c) => c.status === 'SUPPORTED').length}
                 </ThemedText>
-                <ThemedText style={styles.metricLbl}>Supported Claims</ThemedText>
+                <ThemedText style={styles.metricLbl}>Supported</ThemedText>
               </View>
             </View>
           </ThemedView>
@@ -106,38 +106,38 @@ export default function IncidentDetailsScreen() {
               style={styles.actionBtn}
               onPress={() => router.push('/evidence')}
             >
-              <ThemedText style={styles.actionBtnText}>🗄 View Evidence Vault ({evidence.length})</ThemedText>
+              <ThemedText style={styles.actionBtnText}>📁 Evidence Vault ({evidence.length})</ThemedText>
             </Pressable>
             <Pressable
               style={styles.actionBtnSecondary}
               onPress={() => router.push('/incident/create')}
             >
-              <ThemedText style={styles.actionBtnSecondaryText}>+ New Case Record</ThemedText>
+              <ThemedText style={styles.actionBtnSecondaryText}>+ New Record</ThemedText>
             </Pressable>
             <Pressable
               style={styles.actionBtnSecondary}
               onPress={() => router.push('/time-machine')}
             >
-              <ThemedText style={styles.actionBtnSecondaryText}>⏱ Test Consistency</ThemedText>
+              <ThemedText style={styles.actionBtnSecondaryText}>⏱ Test Leaving Out</ThemedText>
             </Pressable>
           </View>
 
           {/* Associated Claims Section */}
           <View style={styles.sectionHeaderRow}>
             <ThemedText type="smallBold" style={styles.sectionHeader}>
-              RECORDED CLAIMS ({claims.length})
+              STATEMENTS ({claims.length})
             </ThemedText>
             <ThemedText type="small" style={styles.sectionSub}>
-              Deterministic status based on supporting/conflicting observations
+              Review status based on saved evidence
             </ThemedText>
           </View>
 
           {isLoading ? (
-            <ThemedText style={styles.loadingText}>Loading claims...</ThemedText>
+            <ThemedText style={styles.loadingText}>Checking statements...</ThemedText>
           ) : claims.length === 0 ? (
             <ThemedView type="backgroundElement" style={styles.emptyCard}>
               <ThemedText type="small" style={styles.emptyText}>
-                No claims recorded in this incident yet.
+                No statements recorded for this case yet.
               </ThemedText>
             </ThemedView>
           ) : (
@@ -151,7 +151,7 @@ export default function IncidentDetailsScreen() {
                   <View style={styles.claimHeader}>
                     <View style={styles.claimIdBadge}>
                       <ThemedText type="smallBold" style={styles.claimIdText}>
-                        Claim #{claim.id}
+                        Statement #{claim.id}
                       </ThemedText>
                     </View>
                     <ClaimStatusBadge status={claim.status} />
@@ -170,19 +170,19 @@ export default function IncidentDetailsScreen() {
                   <View style={styles.obsCountRow}>
                     <View style={styles.countBadgeSupport}>
                       <ThemedText type="smallBold" style={styles.supportCountText}>
-                        ✓ {claim.supportingObservationIds.length} Supporting facts
+                        ✓ {claim.supportingObservationIds.length} Supporting details
                       </ThemedText>
                     </View>
                     <View style={styles.countBadgeConflict}>
                       <ThemedText type="smallBold" style={styles.conflictCountText}>
-                        ✕ {claim.conflictingObservationIds.length} Conflicting facts
+                        ✕ {claim.conflictingObservationIds.length} Disagreeing details
                       </ThemedText>
                     </View>
                   </View>
 
                   <View style={styles.cardFooter}>
                     <ThemedText type="smallBold" style={styles.viewMoreText}>
-                      Inspect linked observations & timeline →
+                      Review details and matching evidence →
                     </ThemedText>
                   </View>
                 </ThemedView>

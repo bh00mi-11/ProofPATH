@@ -66,7 +66,7 @@ export default function TimeMachineScreen() {
           <View style={styles.modeTabBar}>
             <View style={[styles.modeTab, styles.modeTabActive]}>
               <ThemedText type="smallBold" style={styles.modeTabTextActive}>
-                ⏱ Time Machine (Exclusion Simulation)
+                ⏱ What changes if I leave this out?
               </ThemedText>
             </View>
             <Pressable
@@ -74,7 +74,7 @@ export default function TimeMachineScreen() {
               onPress={() => router.push('/stress-test')}
             >
               <ThemedText type="smallBold" style={styles.modeTabTextInactive}>
-                🔬 Record Stress Test (5-Point Check) →
+                🔬 Quick Consistency Check (5-Point) →
               </ThemedText>
             </Pressable>
           </View>
@@ -82,10 +82,10 @@ export default function TimeMachineScreen() {
           {/* Simulation Notice Banner */}
           <ThemedView type="backgroundElement" style={styles.noticeBanner}>
             <ThemedText type="smallBold" style={styles.noticeBannerTitle}>
-              🧪 REVERSIBLE SCENARIO SIMULATION
+              🛡 SAFE & TEMPORARY SIMULATION
             </ThemedText>
             <ThemedText type="small" style={styles.noticeBannerText}>
-              Excluding artifacts in the Time Machine recalculates claim status temporarily. Your underlying vault records and case files remain completely intact and unmodified.
+              Removing an item here only tests what happens without it. Your original evidence files are never deleted or modified.
             </ThemedText>
           </ThemedView>
 
@@ -101,14 +101,14 @@ export default function TimeMachineScreen() {
                 />
                 <ThemedText type="smallBold" style={styles.actionCountTitle}>
                   {isBaseline
-                    ? 'Original Case Baseline Active'
-                    : `Scenario Active: ${excludedEvidenceIds.length} item(s) excluded`}
+                    ? 'All saved evidence is included'
+                    : `Testing without ${excludedEvidenceIds.length} piece(s) of evidence`}
                 </ThemedText>
               </View>
               <ThemedText type="small" style={styles.dimText}>
                 {isBaseline
-                  ? 'All recorded artifacts are currently included in analysis.'
-                  : 'Tap below to restore the baseline case state.'}
+                  ? 'Tap "See what changes without this evidence" on any card below to test.'
+                  : 'Tap "Restore original" to return to your complete record.'}
               </ThemedText>
             </View>
 
@@ -124,7 +124,7 @@ export default function TimeMachineScreen() {
                 type="smallBold"
                 style={isBaseline ? styles.restoreTextDisabled : styles.restoreTextActive}
               >
-                {isBaseline ? '✓ Baseline' : t.timeMachine.restoreAllButton}
+                {isBaseline ? '✓ Original' : '↺ Restore original'}
               </ThemedText>
             </Pressable>
           </ThemedView>
@@ -132,32 +132,39 @@ export default function TimeMachineScreen() {
           {/* Section 1: Simulated Claim Impact */}
           <View style={styles.sectionHeaderRow}>
             <ThemedText type="smallBold" style={styles.sectionHeader}>
-              {t.timeMachine.simulatedImpactTitle}
+              How your statements are affected
             </ThemedText>
             <ThemedText type="small" style={styles.sectionSub}>
-              Deterministic status updates from excluded items
+              See which statements gain or lose support
             </ThemedText>
           </View>
 
           {isBaseline ? (
             <ThemedView type="backgroundElement" style={styles.baselineNoticeCard}>
               <ThemedText type="smallBold" style={styles.baselineNoticeTitle}>
-                All Claims Reflect Baseline Evidence
+                All statements currently reflect your full evidence
               </ThemedText>
               <ThemedText type="small" style={styles.baselineNoticeDesc}>
-                Toggle any artifact below to test what happens if it is unavailable, suppressed, or challenged.
+                Tap "See what changes without this evidence" on any item below to see how your case holds up if that evidence was missing or contested.
               </ThemedText>
             </ThemedView>
           ) : (
-            scenarioResult?.changes.map((change) => (
-              <ClaimChangeCard key={change.claimId} change={change} />
-            ))
+            scenarioResult?.changes.map((change) => {
+              const statementText = claims.find((c) => c.id === change.claimId)?.text;
+              return (
+                <ClaimChangeCard
+                  key={change.claimId}
+                  change={change}
+                  claimStatement={statementText}
+                />
+              );
+            })
           )}
 
           {/* Section 2: Artifact Exclusion Controls */}
           <View style={styles.sectionHeaderRow}>
             <ThemedText type="smallBold" style={styles.sectionHeader}>
-              TOGGLE ARTIFACTS IN SIMULATION ({sortedEvidence.length})
+              Choose evidence to test leaving out ({sortedEvidence.length})
             </ThemedText>
           </View>
 

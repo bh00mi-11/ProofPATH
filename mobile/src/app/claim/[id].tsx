@@ -48,15 +48,15 @@ export default function ClaimDetailScreen() {
             </Pressable>
             <View style={styles.badgeRow}>
               <View style={styles.workspacePill}>
-                <ThemedText style={styles.workspacePillText}>TRACE ENGINE AUDIT</ThemedText>
+                <ThemedText style={styles.workspacePillText}>EVIDENCE REVIEW</ThemedText>
               </View>
               <ThemedText type="small" style={styles.claimIdTag}>
-                Claim ID: {claim?.id || 'N/A'}
+                Statement ID: {claim?.id || 'N/A'}
               </ThemedText>
             </View>
-            <ThemedText type="title">{t.claimDetail.title}</ThemedText>
+            <ThemedText type="title">Statement Review</ThemedText>
             <ThemedText type="default" style={styles.subtitle}>
-              Deterministic Trace Engine justification, supporting observations, and identified contradictions.
+              See which recorded details support this statement and where information may not match.
             </ThemedText>
           </View>
 
@@ -64,7 +64,7 @@ export default function ClaimDetailScreen() {
           <ThemedView type="backgroundElement" style={styles.card}>
             <View style={styles.statusRow}>
               <ThemedText type="smallBold" style={styles.statusTitle}>
-                {t.claimDetail.currentStatus}
+                Current Assessment
               </ThemedText>
               {claim && <ClaimStatusBadge status={claim.status} />}
             </View>
@@ -75,16 +75,151 @@ export default function ClaimDetailScreen() {
 
             <View style={styles.reasonBox}>
               <ThemedText type="tag" style={styles.reasonTag}>
-                DETERMINISTIC EVALUATION REASON
+                WHAT THIS MEANS
               </ThemedText>
               <ThemedText type="default" style={styles.explanationText}>
-                {claim?.explanation || 'No deterministic rationale assigned.'}
+                {claim?.explanation?.replace(/claim/gi, 'statement')?.replace(/observation/gi, 'detail') ||
+                  'Saved evidence is being reviewed for this statement.'}
               </ThemedText>
             </View>
 
+            {/* Special Conflict Assistance Card when status is CONFLICTED */}
+            {claim?.status === 'CONFLICTED' && (() => {
+              // Identify disagreeing pairs
+              let pairDetail1: typeof supportingObservations[0] | null = null;
+              let pairDetail2: typeof supportingObservations[0] | null = null;
+              let conflictType: 'support_vs_contradict' | 'time_inconsistency' | 'unknown' = 'unknown';
+              let conflictExplanation = '';
+
+              if (supportingObservations.length > 0 && conflictingObservations.length > 0) {
+                pairDetail1 = supportingObservations[0];
+                pairDetail2 = conflictingObservations[0];
+                conflictType = 'support_vs_contradict';
+                conflictExplanation = 'One detail was recorded as confirming this statement, while another detail was marked as directly contradicting it.';
+              } else if (supportingObservations.length > 1) {
+                // Check if timestamps differ across active supporting sources
+                const timeObs = supportingObservations.filter((o) =>
+                  o.field && ['timestamp', 'date', 'time', 'event_timestamp'].includes(o.field)
+                );
+                if (timeObs.length >= 2 && timeObs[0].value !== timeObs[1].value) {
+                  pairDetail1 = timeObs[0];
+                  pairDetail2 = timeObs[1];
+                  conflictType = 'time_inconsistency';
+                  conflictExplanation = `Contradictory timestamps detected (${pairDetail1.value} vs. ${pairDetail2.value}) across different saved sources for this statement.`;
+                }
+              }
+
+              const src1 = pairDetail1 ? evidence.find((e) => e.id === pairDetail1?.evidenceId) : null;
+              const src2 = pairDetail2 ? evidence.find((e) => e.id === pairDetail2?.evidenceId) : null;
+
+              return (
+                <View style={styles.conflictHelpCard}>
+                  <View style={styles.conflictHeaderRow}>
+                    <ThemedText style={styles.conflictIcon}>⚠️</ThemedText>
+                    <View style={{ flex: 1 }}>
+                      <ThemedText type="subtitle" style={styles.conflictHelpTitle}>
+                        Information doesn't match
+                      </ThemedText>
+                      <ThemedText type="small" style={styles.conflictHelpSub}>
+                        {conflictType === 'time_inconsistency'
+                          ? 'Incompatible dates or times found for this event.'
+                          : conflictType === 'support_vs_contradict'
+                          ? 'Conflicting details were recorded from different evidence sources.'
+                          : 'A factual disagreement was detected across your saved evidence.'}
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  {/* Disagreeing pair or explicit limitation notice */}
+                  {pairDetail1 && pairDetail2 ? (
+                    <View style={styles.disagreePairCard}>
+                      <ThemedText type="smallBold" style={styles.pairHeaderLabel}>
+                        DISAGREEING DETAILS IDENTIFIED:
+                      </ThemedText>
+
+                      {/* Detail 1 */}
+                      <View style={styles.pairDetailBox}>
+                        <View style={styles.pairDetailTagRow}>
+                          <ThemedText type="smallBold" style={styles.pairDetailTag1}>
+                            Detail A ({String(pairDetail1.field || 'detail').replace('_', ' ')})
+                          </ThemedText>
+                          <ThemedText type="small" style={styles.pairDetailSource}>
+                            Source: {src1?.name || pairDetail1.evidenceId || 'Uploaded record'}
+                          </ThemedText>
+                        </View>
+                        <ThemedText style={styles.pairDetailVal}>"{pairDetail1.value}"</ThemedText>
+                      </View>
+
+                      <View style={styles.pairVsDivider}>
+                        <ThemedText style={styles.pairVsText}>VS</ThemedText>
+                      </View>
+
+                      {/* Detail 2 */}
+                      <View style={styles.pairDetailBox}>
+                        <View style={styles.pairDetailTagRow}>
+                          <ThemedText type="smallBold" style={styles.pairDetailTag2}>
+                            Detail B ({String(pairDetail2.field || 'detail').replace('_', ' ')})
+                          </ThemedText>
+                          <ThemedText type="small" style={styles.pairDetailSource}>
+                            Source: {src2?.name || pairDetail2.evidenceId || 'Uploaded record'}
+                          </ThemedText>
+                        </View>
+                        <ThemedText style={styles.pairDetailVal}>"{pairDetail2.value}"</ThemedText>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.limitationNoticeBox}>
+                      <ThemedText type="smallBold" style={styles.limitationNoticeTitle}>
+                        ℹ️ Note on conflict source:
+                      </ThemedText>
+                      <ThemedText type="small" style={styles.limitationNoticeText}>
+                        No isolated two-detail conflict pair could be matched deterministically. The statement was flagged because of combined evidence conditions. Review all supporting and disagreeing details below.
+                      </ThemedText>
+                    </View>
+                  )}
+
+                  {/* Why the system flagged it */}
+                  <View style={styles.whyBox}>
+                    <ThemedText type="smallBold" style={styles.whyTitle}>
+                      💡 Why the system flagged it
+                    </ThemedText>
+                    <ThemedText type="small" style={styles.whyText}>
+                      • {conflictExplanation || 'The system detected conflicting facts or incompatible dates across your active records.'}{'\n'}
+                      • ProofPath never guesses or deletes anything automatically — both pieces of evidence remain safely preserved in your record.
+                    </ThemedText>
+                  </View>
+
+                  {/* What you can do next */}
+                  <View style={styles.actionBox}>
+                    <ThemedText type="smallBold" style={styles.actionTitle}>
+                      What you can do next
+                    </ThemedText>
+                    <View style={styles.actionBtnsCol}>
+                      <Pressable
+                        style={styles.actionChoiceBtn}
+                        onPress={() => router.push('/time-machine')}
+                      >
+                        <ThemedText style={styles.actionChoiceBtnText}>
+                          ⏱ Test Leaving Out One Source (Time Machine)
+                        </ThemedText>
+                      </Pressable>
+                      <Pressable
+                        style={styles.actionChoiceBtnSecondary}
+                        onPress={() => router.push('/evidence')}
+                      >
+                        <ThemedText style={styles.actionChoiceBtnSecondaryText}>
+                          📁 Review or Add Another Supporting Record
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              );
+            })()}
+
             <View style={styles.evalNotice}>
               <ThemedText type="small" style={styles.evalNoticeText}>
-                ℹ️ Status reflects internal evidence matching in ProofPath. It does not constitute a judicial conclusion or police finding.
+                ℹ️ This assessment organizes your saved records. It does not replace a police or judicial investigation.
               </ThemedText>
             </View>
           </ThemedView>
@@ -92,14 +227,14 @@ export default function ClaimDetailScreen() {
           {/* Supporting Observations */}
           <View style={styles.sectionHeaderRow}>
             <ThemedText type="smallBold" style={styles.sectionHeader}>
-              SUPPORTING OBSERVATIONS ({supportingObservations.length})
+              SUPPORTING DETAILS ({supportingObservations.length})
             </ThemedText>
           </View>
 
           {supportingObservations.length === 0 ? (
             <ThemedView type="backgroundElement" style={styles.emptyCard}>
               <ThemedText type="small" style={styles.dimText}>
-                No supporting factual observations currently linked to this claim.
+                No supporting details linked to this statement yet.
               </ThemedText>
             </ThemedView>
           ) : (
@@ -110,18 +245,18 @@ export default function ClaimDetailScreen() {
                   <View style={styles.obsHeader}>
                     <View style={styles.factBadgeSupport}>
                       <ThemedText type="smallBold" style={styles.factSupportId}>
-                        ✓ Observation #{obs.id}
+                        ✓ Supporting Detail #{obs.id}
                       </ThemedText>
                     </View>
                     <ThemedText type="small" style={styles.dimText}>
-                      Source: {srcArtifact?.name || obs.evidenceId}
+                      Found in: {srcArtifact?.name || obs.evidenceId}
                     </ThemedText>
                   </View>
                   <ThemedText type="default" style={styles.obsText}>
                     "{obs.text}"
                   </ThemedText>
                   <ThemedText type="small" style={styles.obsMeta}>
-                    Logged at {new Date(obs.recordedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                    Recorded {new Date(obs.recordedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                   </ThemedText>
                 </ThemedView>
               );
@@ -131,14 +266,14 @@ export default function ClaimDetailScreen() {
           {/* Conflicting Observations */}
           <View style={styles.sectionHeaderRow}>
             <ThemedText type="smallBold" style={styles.sectionHeaderConflict}>
-              CONFLICTING OBSERVATIONS ({conflictingObservations.length})
+              DETAILS THAT DON'T MATCH ({conflictingObservations.length})
             </ThemedText>
           </View>
 
           {conflictingObservations.length === 0 ? (
             <ThemedView type="backgroundElement" style={styles.emptyCard}>
               <ThemedText type="small" style={styles.dimText}>
-                No direct contradictory observations detected in the timeline.
+                No contradictory or mismatching details found.
               </ThemedText>
             </ThemedView>
           ) : (
@@ -149,18 +284,18 @@ export default function ClaimDetailScreen() {
                   <View style={styles.obsHeader}>
                     <View style={styles.factBadgeConflict}>
                       <ThemedText type="smallBold" style={styles.factConflictId}>
-                        ✕ Contradiction #{obs.id}
+                        ✕ Disagreeing Detail #{obs.id}
                       </ThemedText>
                     </View>
                     <ThemedText type="small" style={styles.dimText}>
-                      Source: {srcArtifact?.name || obs.evidenceId}
+                      Found in: {srcArtifact?.name || obs.evidenceId}
                     </ThemedText>
                   </View>
                   <ThemedText type="default" style={styles.obsText}>
                     "{obs.text}"
                   </ThemedText>
                   <ThemedText type="small" style={styles.obsMeta}>
-                    Logged at {new Date(obs.recordedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                    Recorded {new Date(obs.recordedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                   </ThemedText>
                 </ThemedView>
               );
@@ -172,7 +307,7 @@ export default function ClaimDetailScreen() {
             style={styles.returnBtn}
             onPress={() => router.push('/evidence')}
           >
-            <ThemedText style={styles.returnBtnText}>← Return to Evidence Repository</ThemedText>
+            <ThemedText style={styles.returnBtnText}>← Return to Evidence Vault</ThemedText>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
@@ -291,6 +426,179 @@ const styles = StyleSheet.create({
     color: '#0F766E',
     fontSize: 12,
     lineHeight: 16,
+  },
+  conflictHelpCard: {
+    backgroundColor: '#FFF7ED',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#FDBA74',
+    padding: 16,
+    gap: 12,
+  },
+  conflictHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  conflictIcon: {
+    fontSize: 22,
+  },
+  conflictHelpTitle: {
+    color: '#C2410C',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  conflictHelpSub: {
+    color: '#9A3412',
+    fontSize: 12,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  disagreePairCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    padding: 12,
+    gap: 8,
+  },
+  pairHeaderLabel: {
+    fontSize: 11,
+    color: '#C2410C',
+    letterSpacing: 0.5,
+  },
+  pairDetailBox: {
+    backgroundColor: '#FFF7ED',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FFEDD5',
+    padding: 10,
+    gap: 4,
+  },
+  pairDetailTagRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  pairDetailTag1: {
+    fontSize: 11,
+    color: '#15803D',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  pairDetailTag2: {
+    fontSize: 11,
+    color: '#B91C1C',
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  pairDetailSource: {
+    fontSize: 11,
+    color: '#7C2D12',
+    fontWeight: '500',
+  },
+  pairDetailVal: {
+    fontSize: 13,
+    color: '#431407',
+    fontWeight: '600',
+  },
+  pairVsDivider: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+  },
+  pairVsText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#EA580C',
+    backgroundColor: '#FFEDD5',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  limitationNoticeBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    padding: 10,
+    gap: 4,
+  },
+  limitationNoticeTitle: {
+    fontSize: 12,
+    color: '#334155',
+  },
+  limitationNoticeText: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16,
+  },
+  conflictHelpDesc: {
+    color: '#7C2D12',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  whyBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+  whyTitle: {
+    color: '#9A3412',
+    fontSize: 12,
+  },
+  whyText: {
+    color: '#7C2D12',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  actionBox: {
+    gap: 8,
+    marginTop: 4,
+  },
+  actionTitle: {
+    color: '#9A3412',
+    fontSize: 12,
+  },
+  actionBtnsCol: {
+    gap: 8,
+  },
+  actionChoiceBtn: {
+    backgroundColor: '#EA580C',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  actionChoiceBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  actionChoiceBtnSecondary: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    alignItems: 'center',
+  },
+  actionChoiceBtnSecondaryText: {
+    color: '#9A3412',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   sectionHeaderRow: {
     marginTop: 4,
