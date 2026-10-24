@@ -35,3 +35,13 @@ backend/tests/test_data/
 # Environment
 .env
 .venv
+
+# Expo / React Native
+node_modules/
+.expo/
+web-build/
+mobile/android/
+mobile/ios/
+mobile/.claude/
+mobile/.vscode/
+mobile/AGENTS.md
