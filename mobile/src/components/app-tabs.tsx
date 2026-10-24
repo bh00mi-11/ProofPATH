@@ -13,7 +13,7 @@ export default function AppTabs() {
       indicatorColor={BrandColors.indigoLight}
       labelStyle={{ selected: { color: BrandColors.indigo } }}>
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Overview</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/home.png')}
           renderingMode="template"
