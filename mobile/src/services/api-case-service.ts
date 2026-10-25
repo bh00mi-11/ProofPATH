@@ -33,7 +33,7 @@ function resolveDefaultApiBase(): string {
     }
     return configured;
   }
-  // Deployed Expo web builds reverse-proxy /api through Vercel to the read-only demo API.
+  // Deployed Expo web builds reverse-proxy /api through Vercel to the Render API.
   // Never request insecure http://<host>:8000 from an HTTPS site.
   if (typeof window !== 'undefined' && window.location && window.location.hostname) {
     if (window.location.hostname.endsWith('.vercel.app')) return window.location.origin;
@@ -46,6 +46,8 @@ function resolveDefaultApiBase(): string {
     const host = expoHost.split(':')[0];
     if (host && host !== 'localhost' && host !== '127.0.0.1') return `http://${host}:8000`;
   }
+  // Production native builds must reach the public backend, never the device's localhost.
+  if (!__DEV__) return 'https://proofpath-v2l4.onrender.com';
   // Android emulator routes host localhost to 10.0.2.2
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:8000';

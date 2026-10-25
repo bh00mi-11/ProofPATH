@@ -46,7 +46,7 @@ export default function HomeScreen() {
         {Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app') && (
           <View style={styles.errorNotice} accessibilityRole="alert">
             <ThemedText style={styles.errorNoticeText}>
-              TEST DEMO ONLY: These are fictional example records. Real evidence uploads, saved changes and SOS notifications are disabled. Do not enter personal details here. In immediate danger, call 112 directly.
+              SYNTHETIC DEMO ONLY: Use fictional case details and test evidence only. This public demo is not suitable for personal or sensitive records; free-hosted data may be lost after a restart. SOS opens your dialer but does not send automatic notifications. In immediate danger, call 112 directly.
             </ThemedText>
           </View>
         )}

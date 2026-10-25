@@ -15,6 +15,31 @@ Rather than storing unorganized screenshots in camera rolls or relying on error-
 
 ---
 
+## Hosted MVP deployment: Vercel website + Render free API
+
+**Website:** https://proofpath-jet.vercel.app (production alias; new branch changes only reach this URL after merge). **Backend:** https://proofpath-v2l4.onrender.com. **Health:** https://proofpath-v2l4.onrender.com/api/health.
+
+```text
+Browser -> Vercel (Expo Web frontend)
+                |
+                +-- /api/* rewrite -> Render Free (FastAPI)
+                                       |-- SQLite (ephemeral)
+                                       +-- uploaded files (ephemeral)
+Android app -------------------------> Render Free (FastAPI)
+```
+
+The browser uses **one Vercel origin**, but FastAPI **runs on Render**, not Vercel. The rewrite in `mobile/vercel.json` forwards API calls to Render. No paid Render Blueprint or credit card is required. For Vercel, set root directory `mobile`, build command `npx expo export --platform web`, and output directory `dist`. Do not override `EXPO_PUBLIC_API_BASE_URL` with an unrelated URL if using the same-origin proxy.
+
+**Existing Render Web Service:** root directory `backend`; build command `pip install -r requirements.txt`; start command `uvicorn app.main:app --host 0.0.0.0 --port $PORT`; health check `/api/health`. Root `render.yaml` is an *optional* free Blueprint with no persistent disk. You do not need to recreate the already-running service.
+
+**Safety:** This public deployment is for fictional cases and synthetic files **only**. Render Free storage is ephemeral: uploaded files and SQLite records may be lost on restart or redeploy. The backend lacks per-user authentication and private evidence access controls. Do not upload real screenshots, identities or incident details. SOS opens the phone dialer and does not automatically alert emergency services.
+
+**Android:** `mobile/eas.json` contains a preview APK profile. Native builds must use `EXPO_PUBLIC_API_BASE_URL=https://proofpath-v2l4.onrender.com` at build time. Native PDF saving/sharing is not implemented and must not be claimed as working.
+
+**Release gate:** Verify health, create a fictional case, upload several synthetic evidence files, inspect the timeline, download a web PDF, and open Remedies. Run backend tests, TypeScript checks and Expo web export before merging the deployment branch. A READY Vercel build alone is not an end-to-end test.
+
+---
+
 ## Table of Contents
 
 - [Problem Statement](#problem-statement)

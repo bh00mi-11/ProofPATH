@@ -2,7 +2,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "https://proofpath-api-bhoomi-2fd6.vercel.app/api/$1"
+      "dest": "https://proofpath-v2l4.onrender.com/api/$1"
     },
     {
       "handle": "filesystem"
