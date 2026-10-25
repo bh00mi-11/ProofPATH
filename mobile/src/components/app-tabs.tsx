@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { BrandColors, Colors } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
@@ -12,7 +12,8 @@ const secondaryRoutes = [
 
 // Render our own text labels: some Android/Expo Go tab bars only show the
 // focused label even when tabBarShowLabel is enabled.
-function VisibleTabBar({ state, descriptors, navigation }: any) {
+function VisibleTabBar({ state, descriptors }: any) {
+  const router = useRouter();
   return (
     <View style={{
       flexDirection: 'row', backgroundColor: Colors.light.backgroundElement,
@@ -35,10 +36,8 @@ function VisibleTabBar({ state, descriptors, navigation }: any) {
             accessibilityLabel={title}
             accessibilityState={{ selected }}
             onPress={() => {
-              const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-              if (!selected && !event.defaultPrevented) navigation.navigate(route.name);
+              if (!selected) router.navigate(route.name === 'index' ? '/' : `/${route.name}` as any);
             }}
-            onLongPress={() => navigation.emit({ type: 'tabLongPress', target: route.key })}
             style={{ flex: 1, alignItems: 'center', justifyContent: 'center', minWidth: 0, gap: 3 }}>
             <Text style={{ fontSize: 22, color, fontWeight: selected ? '700' : '400' }}>
               {icons[route.name] || '•'}
