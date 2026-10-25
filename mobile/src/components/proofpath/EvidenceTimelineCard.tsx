@@ -44,7 +44,7 @@ export function EvidenceTimelineCard({
   onReviewFacts,
   onLinkObservationToClaim,
 }: EvidenceTimelineCardProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [linkingObsId, setLinkingObsId] = useState<string | null>(null);
 
   const isTextDoc = evidence.type === 'document' || evidence.name.endsWith('.txt') || evidence.name.endsWith('.csv');
@@ -96,6 +96,20 @@ export function EvidenceTimelineCard({
           {evidence.name}
         </ThemedText>
 
+        <ThemedText type="small" style={styles.dimText}>
+          {observations.length > 0 ? observations[0].text : 'Saved. Add a note about what this file shows when you are ready.'}
+        </ThemedText>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isExpanded ? 'Hide evidence details' : 'Show evidence details'}
+          onPress={() => setIsExpanded((prev) => !prev)}
+          style={{ paddingVertical: 12 }}>
+          <ThemedText type="smallBold" style={styles.expandLabel}>
+            {isExpanded ? 'Hide details ▲' : 'See details and connections ▼'}
+          </ThemedText>
+        </Pressable>
+        {isExpanded && (
+        <>
         {/* Visual Artifact Preview Card - Derived strictly from artifact facts or shows explicit file status */}
         {observations.length > 0 ? (
           <View style={isTextDoc || evidence.name.endsWith('.pdf') ? styles.documentPreviewBox : styles.imagePreviewBox}>
@@ -125,7 +139,7 @@ export function EvidenceTimelineCard({
               ) : null}
               <View style={styles.previewWatermark}>
                 <ThemedText style={styles.watermarkText}>
-                  CRYPTOGRAPHIC INTEGRITY: {evidence.sha256 ? `${evidence.sha256.slice(0, 16)}...` : 'REGISTERED IN VAULT'}
+                  File fingerprint: {evidence.sha256 ? `${evidence.sha256.slice(0, 16)}...` : 'REGISTERED IN VAULT'}
                 </ThemedText>
               </View>
             </View>
@@ -152,7 +166,7 @@ export function EvidenceTimelineCard({
                   onPress={() => onReviewFacts(evidence)}
                 >
                   <ThemedText style={styles.reviewFactsBtnText}>
-                    ⚡ Review Extracted Facts
+                    Review suggested details
                   </ThemedText>
                 </Pressable>
               ) : null}
@@ -162,7 +176,7 @@ export function EvidenceTimelineCard({
                   onPress={() => onAddObservation(evidence)}
                 >
                   <ThemedText style={styles.addFactManualBtnText}>
-                    + Add Fact / Observation
+                    + Add a note
                   </ThemedText>
                 </Pressable>
               ) : null}
@@ -202,7 +216,7 @@ export function EvidenceTimelineCard({
             style={styles.expandHeader}
             onPress={() => setIsExpanded((prev) => !prev)}>
             <ThemedText type="smallBold" style={styles.expandLabel}>
-              {isExpanded ? '▼ Recorded Details' : '▶ Show Recorded Details'} ({observations.length})
+              {isExpanded ? 'Hide recorded details' : 'Show recorded details'} ({observations.length})
             </ThemedText>
           </Pressable>
 
@@ -212,7 +226,7 @@ export function EvidenceTimelineCard({
                 style={styles.smallActionPill}
                 onPress={() => onReviewFacts(evidence)}
               >
-                <ThemedText style={styles.smallActionPillText}>⚡ Review Details</ThemedText>
+                <ThemedText style={styles.smallActionPillText}>Review suggestions</ThemedText>
               </Pressable>
             ) : null}
             {onAddObservation ? (
@@ -225,6 +239,9 @@ export function EvidenceTimelineCard({
             ) : null}
           </View>
         </View>
+
+        </>
+        )}
 
         {/* Expanded Observation Snippets */}
         {isExpanded && (
