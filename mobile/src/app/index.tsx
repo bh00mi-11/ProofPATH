@@ -92,10 +92,10 @@ export default function HomeScreen() {
               </ThemedText>
             </View>
             <ThemedText type="display" style={styles.heroTitle}>
-              Your evidence. Your story. Your control.
+              You can start here.
             </ThemedText>
             <ThemedText style={styles.heroSubtitle}>
-              Save what happened, understand what your records show, and decide what to share.
+              Save a screenshot or message, see what it shows, and choose your next step. You don't have to do everything at once.
             </ThemedText>
 
             <View style={styles.heroCtaRow}>
@@ -110,7 +110,7 @@ export default function HomeScreen() {
                 accessibilityLabel="Create New Incident Record"
               >
                 <ThemedText style={styles.primaryCtaText}>
-                  + Create New Record
+                  Start a private record
                 </ThemedText>
               </Pressable>
 
@@ -125,7 +125,7 @@ export default function HomeScreen() {
                 accessibilityLabel="View evidence vault"
               >
                 <ThemedText style={styles.secondaryCtaText}>
-                  🗄 {t.home.evidenceVaultTitle}
+                  See saved items
                 </ThemedText>
               </Pressable>
             </View>
@@ -153,7 +153,7 @@ export default function HomeScreen() {
             <View style={styles.metricGrid}>
               <View style={styles.metricItem}>
                 <ThemedText style={styles.metricNumber}>{evidenceCount}</ThemedText>
-                <ThemedText style={styles.metricLabel}>{t.navigation.evidenceTimeline}</ThemedText>
+                <ThemedText style={styles.metricLabel}>Saved files</ThemedText>
               </View>
               <View style={styles.metricDivider} />
               <View style={styles.metricItem}>
@@ -189,10 +189,10 @@ export default function HomeScreen() {
         <View style={styles.pillarsSection}>
           <View style={styles.sectionHeader}>
             <ThemedText type="headline" style={styles.sectionTitle}>
-              Your next steps
+              What would you like to do?
             </ThemedText>
             <ThemedText style={styles.sectionDescription}>
-              Save evidence, review what it shows, share carefully, and find support.
+              Start with one small step. You can come back anytime.
             </ThemedText>
           </View>
 
@@ -239,14 +239,14 @@ export default function HomeScreen() {
                 <ThemedText style={styles.pillarIconEmoji}>⏱</ThemedText>
               </View>
               <ThemedText type="title2" style={styles.pillarTitle}>
-                {t.navigation.analysis}
+                Understand your evidence
               </ThemedText>
               <ThemedText style={styles.pillarText}>
                 {t.home.timeMachineDesc}
               </ThemedText>
               <View style={styles.pillarLinkRow}>
                 <ThemedText style={[styles.pillarLink, { color: BrandColors.teal }]}>
-                  {t.navigation.whatIfRemoved} & {t.navigation.stressTest} →
+                  See what matches and what is uncertain →
                 </ThemedText>
               </View>
             </Pressable>

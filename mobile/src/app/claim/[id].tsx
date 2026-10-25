@@ -48,13 +48,13 @@ export default function ClaimDetailScreen() {
             </Pressable>
             <View style={styles.badgeRow}>
               <View style={styles.workspacePill}>
-                <ThemedText style={styles.workspacePillText}>EVIDENCE REVIEW</ThemedText>
+                <ThemedText style={styles.workspacePillText}>YOUR RECORDS</ThemedText>
               </View>
               <ThemedText type="small" style={styles.claimIdTag}>
                 Statement ID: {claim?.id || 'N/A'}
               </ThemedText>
             </View>
-            <ThemedText type="title">Statement Review</ThemedText>
+            <ThemedText type="title">What does the evidence show?</ThemedText>
             <ThemedText type="default" style={styles.subtitle}>
               See which recorded details support this statement and where information may not match.
             </ThemedText>
@@ -307,7 +307,7 @@ export default function ClaimDetailScreen() {
             style={styles.returnBtn}
             onPress={() => router.push('/evidence')}
           >
-            <ThemedText style={styles.returnBtnText}>← Return to Evidence Vault</ThemedText>
+            <ThemedText style={styles.returnBtnText}>← Back to saved items</ThemedText>
           </Pressable>
         </ScrollView>
       </SafeAreaView>
