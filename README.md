@@ -71,6 +71,9 @@ flowchart LR
 
 ## Example scenario
 
+![ProofPATH fictional evidence-to-report workflow](docs/proofpath-scenario.svg)
+
+
 *Aanya (fictional) receives repeated unwanted messages after asking the sender to stop.*
 
 ```mermaid
