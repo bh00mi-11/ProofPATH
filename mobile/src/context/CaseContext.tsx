@@ -163,7 +163,7 @@ export function CaseProvider({ children }: { children: ReactNode }) {
 
       setExcludedEvidenceIds(nextExclusions);
       try {
-        const activeId = currentCaseId || currentCase?.id || 'case_demo_01';
+        const activeId = currentCase?.id || currentCaseId;
         const newScenario = await apiCaseService.runTimeMachineScenario(nextExclusions, activeId);
         setScenarioResult(newScenario);
       } catch (err: any) {
@@ -177,7 +177,7 @@ export function CaseProvider({ children }: { children: ReactNode }) {
   const restoreOriginalState = useCallback(async () => {
     setExcludedEvidenceIds([]);
     try {
-      const activeId = currentCaseId || currentCase?.id || 'case_demo_01';
+      const activeId = currentCase?.id || currentCaseId;
       const baselineScenario = await apiCaseService.runTimeMachineScenario([], activeId);
       setScenarioResult(baselineScenario);
     } catch (err: any) {
@@ -190,7 +190,7 @@ export function CaseProvider({ children }: { children: ReactNode }) {
     async (recipient: RecipientType) => {
       setSelectedRecipientState(recipient);
       try {
-        const activeId = currentCaseId || currentCase?.id || 'case_demo_01';
+        const activeId = currentCase?.id || currentCaseId;
         const updatedPreview = await apiCaseService.getDisclosurePreview(
           recipient,
           includedDisclosureFields,
@@ -213,7 +213,7 @@ export function CaseProvider({ children }: { children: ReactNode }) {
 
       setIncludedDisclosureFields(nextFields);
       try {
-        const activeId = currentCaseId || currentCase?.id || 'case_demo_01';
+        const activeId = currentCase?.id || currentCaseId;
         const updatedPreview = await apiCaseService.getDisclosurePreview(
           selectedRecipient,
           nextFields,
