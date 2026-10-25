@@ -15,41 +15,28 @@ Rather than storing unorganized screenshots in camera rolls or relying on error-
 
 ---
 
-## Hosted MVP deployment (web + Android)
+## Hosted MVP deployment: Vercel website + Render free API
 
-**Current architecture:** One Expo/React Native codebase targets web and Android; both call the FastAPI service. FastAPI currently stores cases in **SQLite** and uploaded evidence in a **local vault directory**. A persistent disk is mandatory for any backend deployment expected to retain records. **Current free Render deployment has no persistent disk; data can be lost on restart.** The hosted MVP is for **fictional/synthetic demonstrations only** until authentication, per-user authorization, private storage, retention/deletion policy, and an independent security review are completed.
+**Website:** https://proofpath-jet.vercel.app (production alias; new branch changes only reach this URL after merge). **Backend:** https://proofpath-v2l4.onrender.com. **Health:** https://proofpath-v2l4.onrender.com/api/health.
 
 ```text
-Expo Web -> Vercel ----HTTPS----+
-                               +--> FastAPI on Render --> persistent disk (/var/data)
-Android APK (EAS) --HTTPS-------+                       |- proofpath.db (SQLite)
-                                                       +- vault/ (uploaded files)
+Browser -> Vercel (Expo Web frontend)
+                |
+                +-- /api/* rewrite -> Render Free (FastAPI)
+                                       |-- SQLite (ephemeral)
+                                       +-- uploaded files (ephemeral)
+Android app -------------------------> Render Free (FastAPI)
 ```
 
-### Backend on Render
+The browser uses **one Vercel origin**, but FastAPI **runs on Render**, not Vercel. The rewrite in `mobile/vercel.json` forwards API calls to Render. No paid Render Blueprint or credit card is required. For Vercel, set root directory `mobile`, build command `npx expo export --platform web`, and output directory `dist`. Do not override `EXPO_PUBLIC_API_BASE_URL` with an unrelated URL if using the same-origin proxy.
 
-1. In Render, create a **Blueprint** from this GitHub repository using the root `render.yaml`. It provisions a Python web service with a **persistent disk** (paid disk/service may be required). Do not use an ephemeral free instance for retained evidence.
-2. Set `PROOFPATH_CORS_ORIGINS` to the exact allowed website origins (comma-separated, for example `https://YOUR-WEB-DOMAIN.vercel.app`). `PROOFPATH_ENV=production` is set in the blueprint. Disk paths are `PROOFPATH_DB_PATH=/var/data/proofpath.db` and `PROOFPATH_VAULT_DIR=/var/data/vault`.
-3. Confirm `https://YOUR-RENDER-HOST/api/health` responds and test case creation, file upload, export, and persistence across a service restart. Never place actual victim evidence in a publicly accessible demo.
-4. The server's current API does **not** implement per-user authentication/authorization. Keep the deployment restricted to synthetic data until that is implemented.
+**Existing Render Web Service:** root directory `backend`; build command `pip install -r requirements.txt`; start command `uvicorn app.main:app --host 0.0.0.0 --port $PORT`; health check `/api/health`. Root `render.yaml` is an *optional* free Blueprint with no persistent disk. You do not need to recreate the already-running service.
 
-### Frontend on Vercel
+**Safety:** This public deployment is for fictional cases and synthetic files **only**. Render Free storage is ephemeral: uploaded files and SQLite records may be lost on restart or redeploy. The backend lacks per-user authentication and private evidence access controls. Do not upload real screenshots, identities or incident details. SOS opens the phone dialer and does not automatically alert emergency services.
 
-- Project root directory: `mobile`; install: `npm install`; build: `npx expo export --platform web`; output: `dist`.
-- Web builds use Vercel's `/api` reverse proxy to `https://proofpath-v2l4.onrender.com` by default. If overriding `EXPO_PUBLIC_API_BASE_URL`, set it to a reachable HTTPS origin and configure CORS. Redeploy after updating build-time environment variables.
-- **Important:** `mobile/vercel.json` currently proxies `/api/*` to the Render backend at `https://proofpath-v2l4.onrender.com`. This Render free service is **ephemeral**, not persistent; never use real incident evidence. Test `/api/health` and the full write/export flow before release. The public `EXPO_PUBLIC_` value is not a secret.
-- Deploy branch previews first; promote to `main` only after a passing web build and an end-to-end test.
+**Android:** `mobile/eas.json` contains a preview APK profile. Native builds must use `EXPO_PUBLIC_API_BASE_URL=https://proofpath-v2l4.onrender.com` at build time. Native PDF saving/sharing is not implemented and must not be claimed as working.
 
-### Android APK (not Expo Go)
-
-- `mobile/eas.json` defines a `preview` profile that produces an installable Android **APK**. Install EAS CLI, authenticate, then run `cd mobile && eas build --platform android --profile preview`.
-- Set `EXPO_PUBLIC_API_BASE_URL` to the **same HTTPS backend URL at build time** in the EAS environment. The APK cannot call your laptop's `localhost` or private LAN address after installation.
-- Native PDF saving/sharing is **not yet implemented** in the current mobile report preview: browser download works only on web. Do not claim Android PDF export is ready until tested on a device.
-- Test all five visible tabs, New Case, upload, evidence review, report export, Remedies, and SOS copy on a physical phone. SOS does **not** dispatch police or automatically deliver messages.
-
-### Release gate
-
-Do not merge deployment work merely because files exist. Check `npx tsc --noEmit`, Expo web export, backend tests, preview deployment logs, and a real end-to-end synthetic-data run. **Deployment is not proof of privacy or production safety.**
+**Release gate:** Verify health, create a fictional case, upload several synthetic evidence files, inspect the timeline, download a web PDF, and open Remedies. Run backend tests, TypeScript checks and Expo web export before merging the deployment branch. A READY Vercel build alone is not an end-to-end test.
 
 ---
 
