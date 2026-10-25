@@ -17,7 +17,7 @@ Rather than storing unorganized screenshots in camera rolls or relying on error-
 
 ## Hosted MVP deployment (web + Android)
 
-**Current architecture:** One Expo/React Native codebase targets web and Android; both call the FastAPI service. FastAPI currently stores cases in **SQLite** and uploaded evidence in a **local vault directory**. A persistent disk is mandatory for any backend deployment expected to retain records. The hosted MVP is for **fictional/synthetic demonstrations only** until authentication, per-user authorization, private storage, retention/deletion policy, and an independent security review are completed.
+**Current architecture:** One Expo/React Native codebase targets web and Android; both call the FastAPI service. FastAPI currently stores cases in **SQLite** and uploaded evidence in a **local vault directory**. A persistent disk is mandatory for any backend deployment expected to retain records. **Current free Render deployment has no persistent disk; data can be lost on restart.** The hosted MVP is for **fictional/synthetic demonstrations only** until authentication, per-user authorization, private storage, retention/deletion policy, and an independent security review are completed.
 
 ```text
 Expo Web -> Vercel ----HTTPS----+
@@ -36,8 +36,8 @@ Android APK (EAS) --HTTPS-------+                       |- proofpath.db (SQLite)
 ### Frontend on Vercel
 
 - Project root directory: `mobile`; install: `npm install`; build: `npx expo export --platform web`; output: `dist`.
-- Set `EXPO_PUBLIC_API_BASE_URL=https://YOUR-RENDER-HOST` for web builds; redeploy after updating build-time environment variables.
-- **Important:** `mobile/vercel.json` currently proxies `/api/*` to the historical `proofpath-api-bhoomi-2fd6.vercel.app` demo API. Do **not** mistake that endpoint for the persistent Render backend. Before promoting a release, replace/remove that old proxy deliberately and test direct HTTPS API requests and CORS. The public `EXPO_PUBLIC_` value is not a secret.
+- Web builds use Vercel's `/api` reverse proxy to `https://proofpath-v2l4.onrender.com` by default. If overriding `EXPO_PUBLIC_API_BASE_URL`, set it to a reachable HTTPS origin and configure CORS. Redeploy after updating build-time environment variables.
+- **Important:** `mobile/vercel.json` currently proxies `/api/*` to the Render backend at `https://proofpath-v2l4.onrender.com`. This Render free service is **ephemeral**, not persistent; never use real incident evidence. Test `/api/health` and the full write/export flow before release. The public `EXPO_PUBLIC_` value is not a secret.
 - Deploy branch previews first; promote to `main` only after a passing web build and an end-to-end test.
 
 ### Android APK (not Expo Go)
