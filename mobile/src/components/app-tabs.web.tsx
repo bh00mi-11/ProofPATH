@@ -1,4 +1,3 @@
-import type { Href } from 'expo-router';
 import { Slot, usePathname, useRouter, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View, useColorScheme, Linking, Platform, ScrollView } from 'react-native';
 
