@@ -158,12 +158,15 @@ export default function ReportPreviewScreen() {
                 <ThemedText style={styles.workspacePillText}>REPORT PREVIEW</ThemedText>
               </View>
               <ThemedText type="small" style={styles.caseBadge}>
+                {currentCase?.title || `Case #${caseId}`}
+              </ThemedText>
+              <ThemedText type="small" style={styles.caseBadge}>
                 Target: {recipientLabel}
               </ThemedText>
             </View>
             <ThemedText type="title">Privacy-Reviewed Incident Report</ThemedText>
             <ThemedText type="default" style={styles.subtitle}>
-              Pre-export verification showing active redactions, allowed disclosures, and cryptographic audit hashes.
+              Pre-export verification showing active redactions, allowed disclosures, and cryptographic audit hashes for "{currentCase?.title || caseId}".
             </ThemedText>
           </View>
 

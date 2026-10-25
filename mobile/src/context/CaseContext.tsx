@@ -91,19 +91,34 @@ export function CaseProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     setBackendError(null);
     try {
-      const activeId = targetCaseId || currentCaseId || 'case_demo_01';
-      const [allCases, fullData, initialScenario, initialPreview] =
+      const allCases = await apiCaseService.getCases().catch(() => []);
+      setAvailableCases(allCases);
+
+      let activeId = targetCaseId || currentCaseId;
+      if (!activeId || activeId === 'case_demo_01') {
+        if (targetCaseId) {
+          activeId = targetCaseId;
+        } else if (currentCaseId && allCases.some((c) => c.id === currentCaseId)) {
+          activeId = currentCaseId;
+        } else if (allCases.length > 0) {
+          const nonDemoCases = allCases.filter((c) => c.id !== 'case_demo_01');
+          activeId = nonDemoCases.length > 0 ? nonDemoCases[nonDemoCases.length - 1].id : allCases[0].id;
+        } else {
+          activeId = 'case_demo_01';
+        }
+      }
+
+      const [fullData, initialScenario, initialPreview] =
         await Promise.all([
-          apiCaseService.getCases().catch(() => []),
           apiCaseService.getFullCase(activeId),
           apiCaseService.runScenario(activeId, []).catch(() => null),
           apiCaseService.getDisclosurePreview(
-            'TRUSTED_CONTACT',
-            [...ALL_DISCLOSURE_FIELDS]
+            selectedRecipient,
+            [...ALL_DISCLOSURE_FIELDS],
+            activeId
           ).catch(() => null),
         ]);
 
-      setAvailableCases(allCases);
       setCurrentCase(fullData.case);
       setCurrentCaseId(fullData.case.id);
       setEvidence(fullData.artifacts);
@@ -124,7 +139,7 @@ export function CaseProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [currentCaseId]);
+  }, [currentCaseId, selectedRecipient]);
 
   const selectCase = useCallback(async (caseId: string) => {
     setCurrentCaseId(caseId);
@@ -169,16 +184,18 @@ export function CaseProvider({ children }: { children: ReactNode }) {
     async (recipient: RecipientType) => {
       setSelectedRecipientState(recipient);
       try {
+        const activeId = currentCaseId || currentCase?.id || 'case_demo_01';
         const updatedPreview = await apiCaseService.getDisclosurePreview(
           recipient,
-          includedDisclosureFields
+          includedDisclosureFields,
+          activeId
         );
         setDisclosurePreview(updatedPreview);
       } catch (err: any) {
         setBackendError(err?.message || 'Privacy disclosure preview failed on backend');
       }
     },
-    [includedDisclosureFields]
+    [currentCase, currentCaseId, includedDisclosureFields]
   );
 
   // Toggle a field included/excluded for Privacy Preview
@@ -190,16 +207,18 @@ export function CaseProvider({ children }: { children: ReactNode }) {
 
       setIncludedDisclosureFields(nextFields);
       try {
+        const activeId = currentCaseId || currentCase?.id || 'case_demo_01';
         const updatedPreview = await apiCaseService.getDisclosurePreview(
           selectedRecipient,
-          nextFields
+          nextFields,
+          activeId
         );
         setDisclosurePreview(updatedPreview);
       } catch (err: any) {
         setBackendError(err?.message || 'Field toggle failed on backend');
       }
     },
-    [includedDisclosureFields, selectedRecipient]
+    [currentCase, currentCaseId, includedDisclosureFields, selectedRecipient]
   );
 
   const createNewCase = useCallback(
@@ -208,11 +227,13 @@ export function CaseProvider({ children }: { children: ReactNode }) {
       setBackendError(null);
       try {
         const newCase = await apiCaseService.createCase(title, description);
+        setCurrentCaseId(newCase.id);
         setCurrentCase(newCase);
         setEvidence([]);
         setObservations([]);
         setClaims([]);
         setExcludedEvidenceIds([]);
+        setAvailableCases((prev) => [...prev.filter((c) => c.id !== newCase.id), newCase]);
         return newCase;
       } catch (err: any) {
         const msg = err?.message || 'Failed to create new case record';
@@ -261,7 +282,7 @@ export function CaseProvider({ children }: { children: ReactNode }) {
       try {
         const newEvidence = await apiCaseService.uploadEvidence(caseId, file);
         setEvidence((prev) => [...prev, newEvidence]);
-        await refreshData();
+        await refreshData(caseId);
         return newEvidence;
       } catch (err: any) {
         const msg = err?.message || 'Failed to upload evidence artifact';

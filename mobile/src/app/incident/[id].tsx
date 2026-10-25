@@ -14,11 +14,17 @@ import { safeBack } from '@/utils/navigation';
 export default function IncidentDetailsScreen() {
   const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { currentCase, claims, evidence, isLoading } = useCaseState();
+  const { currentCase, claims, evidence, isLoading, selectCase } = useCaseState();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
 
   const caseId = id || currentCase?.id || 'case_demo_01';
+
+  React.useEffect(() => {
+    if (id && currentCase?.id !== id) {
+      selectCase(id);
+    }
+  }, [id, currentCase?.id, selectCase]);
 
   return (
     <ThemedView style={styles.container}>

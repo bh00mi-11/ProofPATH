@@ -37,6 +37,8 @@ export default function PrivacyScreen() {
   const { t } = useTranslation();
   const {
     currentCase,
+    availableCases,
+    selectCase,
     selectedRecipient,
     includedDisclosureFields,
     disclosurePreview,
@@ -68,9 +70,31 @@ export default function PrivacyScreen() {
               <View style={styles.workspacePill}>
                 <ThemedText style={styles.workspacePillText}>SHARE SAFELY WORKSPACE</ThemedText>
               </View>
-              <ThemedText type="small" style={styles.caseBadge}>
-                {currentCase?.title || 'Case Disclosure'}
-              </ThemedText>
+              {availableCases.length > 1 ? (
+                <View style={styles.casePickerRow}>
+                  {availableCases.map((c) => {
+                    const isSelected = c.id === currentCase?.id;
+                    return (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => selectCase(c.id)}
+                        style={[styles.caseSelectorPill, isSelected && styles.caseSelectorPillActive]}
+                      >
+                        <ThemedText
+                          type="smallBold"
+                          style={isSelected ? styles.caseSelectorPillTextActive : styles.caseSelectorPillTextInactive}
+                        >
+                          {c.title ? (c.title.length > 20 ? `${c.title.slice(0, 20)}...` : c.title) : c.id}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : (
+                <ThemedText type="small" style={styles.caseBadge}>
+                  {currentCase?.title || 'Case Disclosure'}
+                </ThemedText>
+              )}
             </View>
             <ThemedText type="title">{t.privacy.title}</ThemedText>
             <ThemedText type="default" style={styles.subtitle}>
@@ -419,5 +443,31 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
     fontSize: 13,
+  },
+  casePickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    alignItems: 'center',
+  },
+  caseSelectorPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+    backgroundColor: Colors.light.backgroundSubtle,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  caseSelectorPillActive: {
+    backgroundColor: BrandColors.indigoLight,
+    borderColor: BrandColors.indigoBorder,
+  },
+  caseSelectorPillTextActive: {
+    color: BrandColors.indigo,
+    fontSize: 11,
+  },
+  caseSelectorPillTextInactive: {
+    color: Colors.light.textSecondary,
+    fontSize: 11,
   },
 });
