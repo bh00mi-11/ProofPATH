@@ -17,6 +17,13 @@ export default function RootLayout() {
 
   useEffect(() => {
     setMounted(true);
+    if (Platform.OS !== 'web') {
+      // A splash screen held with preventAutoHideAsync must be released explicitly.
+      // Otherwise Expo Go can remain on a blank screen despite a successful bundle.
+      SplashScreen.hideAsync().catch((error) => {
+        console.warn('Unable to dismiss splash screen', error);
+      });
+    }
   }, []);
 
   if (!mounted) {
