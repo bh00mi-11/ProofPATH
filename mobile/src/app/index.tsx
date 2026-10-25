@@ -42,6 +42,13 @@ export default function HomeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        {Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app') && (
+          <View style={styles.errorNotice} accessibilityRole="alert">
+            <ThemedText style={styles.errorNoticeText}>
+              TEST DEMO ONLY: These are fictional example records. Real evidence uploads, saved changes and SOS notifications are disabled. Do not enter personal details here. In immediate danger, call 112 directly.
+            </ThemedText>
+          </View>
+        )}
         {/* Top Safety Ribbon */}
         <View style={styles.emergencyRibbon}>
           <View style={styles.emergencyLeft}>
