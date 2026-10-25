@@ -40,6 +40,92 @@ The browser uses **one Vercel origin**, but FastAPI **runs on Render**, not Verc
 
 ---
 
+## Release status — recHERsion'26 (25 October 2026)
+
+**Submission branch:** `main` | **Scope:** pre-authentication demonstration MVP | **Audience:** fictional/synthetic evidence only.
+
+**Hosted web app:** https://proofpath-jet.vercel.app (Expo Web on Vercel). **API:** https://proofpath-v2l4.onrender.com (FastAPI on Render Free). The browser uses a Vercel `/api/*` rewrite to the Render API. This is **not an all-Vercel deployment**. The deployed revision and availability should be checked separately; merging GitHub code does not prove the production URL updated.
+
+### Feature inventory and implementation status
+
+| Capability | Status in `main` | Implementation boundary |
+| --- | --- | --- |
+| Case creation, incident overview and timeline | Implemented | Public demo lacks user-specific isolation |
+| Evidence upload, multi-file selection and SHA-256 hashing | Implemented | Multiple files are submitted sequentially; hashing is not proof that an incident occurred |
+| Observation proposals and manual review | Implemented | Text-oriented extraction; image OCR is not guaranteed |
+| Claims, support/contradiction links and explainable trace states | Implemented | Rules evaluate recorded relationships, not legal truth |
+| Non-destructive scenario simulation (Time Machine) | Implemented | Simulated results do not modify originals |
+| Record stress testing | Implemented | Flags gaps and fragile dependencies |
+| Privacy Lens disclosure preview and recipient field allowlists | Implemented | Not a substitute for access control or a production privacy audit |
+| Web PDF report export | Implemented; previously tested in hosted browser | Native APK PDF saving/sharing is not complete |
+| Accountability Trail: user-entered actions, statuses, references, linked evidence, follow-up dates and completion | Implemented | Entries are user-reported; attachment support does **not** mean an authority confirmed the event |
+| Legal context, remedies and next-step navigator | Implemented | Informational only; not personalized legal advice |
+| Guardian contacts / SOS-oriented UI | Prototype | No automatic emergency dispatch; personal-data protections are incomplete |
+| English, Hindi and Marathi interface support | Implemented at MVP level | Translation and accessibility coverage require review |
+| Login, registration and secure sessions | **Not in `main`** | Experimental code exists on a separate development branch; not production-ready |
+| Admin login, admin dashboard and role-specific workflows | **Planned** | No independently verified official actions |
+| Backend-enforced case ownership and private evidence access | **Not in `main`** | Do not upload genuine private evidence |
+| Persistent production database and encrypted durable evidence storage | **Planned** | Render Free SQLite and file vault are ephemeral |
+| Android APK distribution and native PDF share | **Not verified/completed** | The phone-browser experience is available via Vercel |
+
+### Final deployed architecture
+
+```text
+Phone Chrome / Safari                  Desktop browser
+          \                              /
+           \                            /
+              Vercel: Expo Web / React Native UI
+              - Expo Router screens
+              - CaseContext + LanguageContext
+              - Evidence, Trace, Time Machine, Privacy, Accountability,
+                Remedies, Support and Guardian interfaces
+                           |
+                      HTTPS /api/*
+                           |
+                  Vercel rewrite proxy
+                           |
+                  Render Free: FastAPI
+                  - Cases and evidence APIs
+                  - File ingest + SHA-256 vault
+                  - Observations, claim links and trace rules
+                  - Scenario and stress-test engines
+                  - Disclosure allowlists + ReportLab PDF
+                  - Accountability, legal context and navigator
+                           |
+                 SQLite + local file vault
+                 (ephemeral on free hosting)
+
+Expo Go / native development app -> Render API directly
+(no production APK or native PDF export claimed)
+```
+
+**Evidence-processing sequence:** Create fictional case → upload synthetic evidence → review observations → add claims and evidence links → inspect `SUPPORTED`, `CONFLICTED`, `UNVERIFIED` or `REVIEW_NEEDED` explanations → optionally simulate excluded evidence → inspect stress test → record a user-reported institutional action and follow-up → preview recipient disclosure → explicitly confirm → export PDF on web.
+
+**Accountability provenance:** An entry records what a user says they did, when they say they did it, its reference number, optional attached document, status and next follow-up. A linked document may support the report, but **neither the entry nor the attachment represents police, platform or institutional verification**. Future admin workflows must keep user-reported and independently verified events visibly separate and record who made each change.
+
+### Near-future implementation: authentication, admin and privacy hardening
+
+These are **not part of the submitted pre-login MVP**:
+
+1. **User identity:** Registration, sign-in/sign-out, password reset, session expiry, rate limiting and safe session storage; do not ship the experimental development-branch implementation without security review.
+2. **Case ownership:** Every case, claim, observation, artifact, download, scenario, disclosure, PDF and accountability endpoint must verify the authenticated user's access on the server. Include negative cross-account and IDOR tests.
+3. **Admin role:** Provisioned admin accounts, least-privilege access, explicit case-assignment/consent policy, separate admin views, actor attribution and audit history. Admins must not automatically have unrestricted access to survivor records.
+4. **Accountability verification:** User-created records stay `USER_REPORTED`; authorized verification must be a distinct, attributable action with documented evidence and an append-only history.
+5. **Private data infrastructure:** Durable database and file storage, encryption, backups, deletion/retention policies, secure logging, malware/file-type checks and redaction validation of exported documents.
+6. **Release gate:** Test registration, login, logout, expiry, account A/B isolation, cross-case artifact access, PDF privacy, mobile/web navigation, regression coverage and a full synthetic end-to-end workflow before production deployment.
+
+**Security warning:** SHA-256 detects post-ingestion changes to stored bytes; it does not authenticate uploaders, prove real-world facts, guarantee evidence confidentiality or provide legal certification. The current public demonstration must use **fictional cases only**.
+
+### Demo and submission checklist
+
+- Open the Vercel website in a desktop browser and phone browser.
+- Verify the Render `/api/health` endpoint.
+- Demonstrate a complete fictional evidence-to-PDF workflow, including traceability and a user-reported Accountability Trail entry.
+- Submit repository, PPT and demo video. Login is **not** an implemented feature and must not be represented as such.
+- No commits to the submitted repository after **25 October 2026, 9:00 PM IST**, per the recHERsion'26 rulebook.
+
+---
+
 ## Table of Contents
 
 - [Problem Statement](#problem-statement)
@@ -357,8 +443,8 @@ Data redaction is never performed purely in client-side CSS or UI toggles. The F
 ### 3. Explicit Confirmation Required
 Unconfirmed export requests (`confirmed_config: false`) are rejected with HTTP `400 Bad Request`. Users must explicitly inspect and confirm the privacy preview before a PDF is compiled.
 
-### 4. Cross-Case Isolation
-Strict case boundary validation prevents cross-case linking or evidence retrieval. Attempts to reference an artifact from another case return HTTP `403/404`.
+### 4. Cross-Case Link Validation (Not User Authorization)
+Some link operations validate that referenced records belong to the same case. **This does not provide per-user case ownership or secure artifact retrieval.** The public MVP has no completed authentication boundary.
 
 ### 5. Clear Boundaries
 - ProofPath does not claim to provide complete anonymity, nor does it guarantee the admissibility of evidence in any specific court.
@@ -617,7 +703,7 @@ The FastAPI backend exposes the following REST endpoints:
 
 ## Testing and Validation
 
-ProofPath includes an extensive test suite covering core logic, cryptographic validation, privacy leak prevention, and negative edge cases.
+ProofPath includes backend tests covering core logic, hashing, privacy filtering and negative paths. The previously recorded results below are historical; this README edit does not represent a fresh CI or deployment verification.
 
 ### Running Backend Tests
 From the `backend/` directory:
@@ -625,7 +711,7 @@ From the `backend/` directory:
 pytest -v
 ```
 
-### Verified Test Results
+### Previously Recorded Test Results (not re-run for this documentation update)
 ```text
 ============================= test session starts =============================
 platform win32 -- Python 3.13.9, pytest-9.1.1
@@ -678,7 +764,7 @@ While ProofPath provides robust evidence structuring, users and developers shoul
 
 ## Future Roadmap
 
-The following improvements are planned for future production versions:
+Authentication, admin roles, case ownership, durable storage and security tests are the **highest-priority future release gates** (see the near-future section above). Additional improvements planned for future production versions:
 
 - [ ] **Multi-Format OCR Pipeline:** Integrating local, privacy-preserving OCR for automated fact extraction from screenshots.
 - [ ] **Cryptographic Signing (Ed25519):** Adding hardware-backed cryptographic signatures to seal case archives at specific points in time.
