@@ -1,3 +1,4 @@
+import type { Href } from 'expo-router';
 import { Slot, usePathname, useRouter, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View, useColorScheme, Linking, Platform, ScrollView } from 'react-native';
 
@@ -137,7 +138,7 @@ export default function AppTabs() {
           <View style={styles.rightActionsRow}>
             {/* Guardian Mode Quick Badge */}
             <Pressable
-              onPress={() => router.push('/guardian')}
+              onPress={() => router.push('/guardian' as Href)}
               style={({ pressed, hovered }: any) => [
                 styles.guardianPill,
                 isGuardianActive ? styles.guardianPillActive : styles.guardianPillInactive,
@@ -182,7 +183,7 @@ export default function AppTabs() {
               </Pressable>
               <Text style={styles.subNavDivider}>•</Text>
               <Pressable
-                onPress={() => router.push('/stress-test')}
+                onPress={() => router.push('/stress-test' as Href)}
                 style={[styles.subNavLink, pathname === '/stress-test' && styles.subNavLinkActive]}>
                 <Text style={[styles.subNavText, pathname === '/stress-test' && styles.subNavTextActive]}>
                   {t.navigation.stressTest}
@@ -231,7 +232,7 @@ export default function AppTabs() {
               </Pressable>
               <Text style={styles.subNavDivider}>•</Text>
               <Pressable
-                onPress={() => router.push('/accountability')}
+                onPress={() => router.push('/accountability' as Href)}
                 style={[styles.subNavLink, pathname === '/accountability' && styles.subNavLinkActive]}>
                 <Text style={[styles.subNavText, pathname === '/accountability' && styles.subNavTextActive]}>
                   {t.navigation.accountabilityTrail}
@@ -239,7 +240,7 @@ export default function AppTabs() {
               </Pressable>
               <Text style={styles.subNavDivider}>•</Text>
               <Pressable
-                onPress={() => router.push('/legal-context')}
+                onPress={() => router.push('/legal-context' as Href)}
                 style={[styles.subNavLink, pathname === '/legal-context' && styles.subNavLinkActive]}>
                 <Text style={[styles.subNavText, pathname === '/legal-context' && styles.subNavTextActive]}>
                   {t.navigation.legalContext}
@@ -247,7 +248,7 @@ export default function AppTabs() {
               </Pressable>
               <Text style={styles.subNavDivider}>•</Text>
               <Pressable
-                onPress={() => router.push('/remedies')}
+                onPress={() => router.push('/remedies' as Href)}
                 style={[styles.subNavLink, pathname === '/remedies' && styles.subNavLinkActive]}>
                 <Text style={[styles.subNavText, pathname === '/remedies' && styles.subNavTextActive]}>
                   {t.navigation.remediesJustice}
