@@ -1,5 +1,5 @@
 import { Slot, usePathname, useRouter, type Href } from 'expo-router';
-import { Pressable, StyleSheet, Text, View, useColorScheme, Linking, Platform } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useColorScheme, Linking, Platform, ScrollView } from 'react-native';
 
 import { BrandColors, Colors, MaxContentWidth, Spacing, Radii } from '@/constants/theme';
 import { ThemedText } from './themed-text';
@@ -100,8 +100,12 @@ export default function AppTabs() {
             </View>
           </Pressable>
 
-          {/* Center: Consolidated 5-Pillar Navigation with generous professional spacing */}
-          <View style={styles.tabLinksRow}>
+          {/* Center: Consolidated 5-Pillar Navigation with mobile-friendly horizontal scroll */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tabScrollContent}
+            style={styles.tabLinksScrollView}>
             {navItems.map((item) => {
               const active = item.matchPaths.some((p) => pathname === p);
               return (
@@ -127,7 +131,7 @@ export default function AppTabs() {
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
 
           {/* Right: Guardian Mode, 112 Emergency Shortcut, and Language Selector */}
           <View style={styles.rightActionsRow}>
@@ -394,6 +398,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     marginTop: 1,
   },
+  tabLinksScrollView: {
+    maxWidth: '100%',
+  },
+  tabScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 2,
+  },
   tabLinksRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -401,8 +414,8 @@ const styles = StyleSheet.create({
   },
   tabButtonView: {
     position: 'relative',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 8,
     cursor: 'pointer' as any,
   },

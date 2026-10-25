@@ -65,10 +65,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Secure CORS configuration: explicit origins, avoiding wildcard with credentials
+# Secure CORS configuration: allow all origins in development or when testing via mobile LAN
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS if ALLOWED_ORIGINS else ["http://localhost:3000"],
+    allow_origins=["*"] if ENV_MODE == "development" else (ALLOWED_ORIGINS if ALLOWED_ORIGINS else ["http://localhost:3000"]),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
