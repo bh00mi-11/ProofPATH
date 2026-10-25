@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -41,6 +42,7 @@ export default function ReportPreviewScreen() {
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+  const [nativePdfUri, setNativePdfUri] = useState<string | null>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
 
   const activeBlobUrlRef = useRef<string | null>(null);
@@ -106,11 +108,23 @@ export default function ReportPreviewScreen() {
     try {
       const blob = await apiCaseService.exportPdf(caseId, selectedRecipient, true);
 
-      // Verify blob is valid
+      // Native Expo returns a saved file URI, not a Blob. React Native cannot
+      // construct Blob from ArrayBuffer and browser object URLs do not work here.
       if (!blob || blob.size === 0) {
         throw new Error('Received empty PDF document from the server.');
       }
-
+      if ('uri' in blob) {
+        setNativePdfUri(blob.uri);
+        setPdfBlob(null);
+        setExportSuccess(`Privacy-reviewed PDF generated (${(blob.size / 1024).toFixed(1)} KB).`);
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(blob.uri, { mimeType: 'application/pdf', dialogTitle: 'Share ProofPATH report' });
+        } else {
+          setExportError('PDF saved locally, but sharing is unavailable on this device.');
+        }
+        return;
+      }
+      setNativePdfUri(null);
       setPdfBlob(blob);
 
       // Revoke previous persistent preview URL if exists
@@ -384,7 +398,7 @@ export default function ReportPreviewScreen() {
               </View>
             ) : null}
 
-            {pdfBlob ? (
+            {pdfBlob || nativePdfUri ? (
               <View style={styles.downloadOptionsBox}>
                 <ThemedText type="smallBold" style={styles.downloadOptionsTitle}>
                   DOCUMENT READY FOR SHARING:
