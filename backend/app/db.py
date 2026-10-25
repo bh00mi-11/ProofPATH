@@ -189,6 +189,20 @@ def init_db(db_path: Path = DB_PATH) -> None:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
+            conn.executescript("""
+            CREATE TABLE IF NOT EXISTS accountability_verifications (
+                id TEXT PRIMARY KEY,
+                entry_id TEXT NOT NULL,
+                case_id TEXT NOT NULL,
+                reviewer_id TEXT NOT NULL,
+                decision TEXT NOT NULL CHECK(decision IN ('VERIFIED','REJECTED')),
+                rationale TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(entry_id) REFERENCES accountability_entries(id),
+                FOREIGN KEY(case_id) REFERENCES cases(id),
+                FOREIGN KEY(reviewer_id) REFERENCES users(id)
+            );
+            """)
             # Ensure original_artifact_id column exists if table was created in an earlier migration
             try:
                 conn.execute("ALTER TABLE accountability_entries ADD COLUMN original_artifact_id TEXT")
