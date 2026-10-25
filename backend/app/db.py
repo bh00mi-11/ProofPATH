@@ -168,6 +168,41 @@ def init_db(db_path: Path = DB_PATH) -> None:
                 FOREIGN KEY (artifact_id) REFERENCES artifacts(id) ON DELETE SET NULL
             );
             ''')
+            conn.executescript("""
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'user',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS sessions (
+                token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL,
+                expires_at TEXT NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS case_owners (
+                case_id TEXT PRIMARY KEY, user_id TEXT NOT NULL,
+                FOREIGN KEY(case_id) REFERENCES cases(id),
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            );
+            CREATE TABLE IF NOT EXISTS auth_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id TEXT,
+                case_id TEXT, action TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+            conn.executescript("""
+            CREATE TABLE IF NOT EXISTS accountability_verifications (
+                id TEXT PRIMARY KEY,
+                entry_id TEXT NOT NULL,
+                case_id TEXT NOT NULL,
+                reviewer_id TEXT NOT NULL,
+                decision TEXT NOT NULL CHECK(decision IN ('VERIFIED','REJECTED')),
+                rationale TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(entry_id) REFERENCES accountability_entries(id),
+                FOREIGN KEY(case_id) REFERENCES cases(id),
+                FOREIGN KEY(reviewer_id) REFERENCES users(id)
+            );
+            """)
             # Ensure original_artifact_id column exists if table was created in an earlier migration
             try:
                 conn.execute("ALTER TABLE accountability_entries ADD COLUMN original_artifact_id TEXT")
