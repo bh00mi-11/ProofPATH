@@ -14,11 +14,14 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BrandColors, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { apiCaseService } from '@/services/api-case-service';
+import { useCaseState } from '@/context/CaseContext';
 import type { StressTestResult, StressTestIssue, StressTestChecklist } from '@/types/proofpath.types';
 import { useTranslation } from '@/context/LanguageContext';
 
 export default function StressTestScreen() {
   const { t } = useTranslation();
+  const { currentCase } = useCaseState();
+  const caseId = currentCase?.id;
   const [data, setData] = useState<StressTestResult | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,10 +29,16 @@ export default function StressTestScreen() {
   const isDesktop = width >= 1024;
 
   const fetchStressTest = useCallback(async () => {
+    if (!caseId) {
+      setData(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const res = await apiCaseService.runStressTest('case_demo_01');
+      const res = await apiCaseService.runStressTest(caseId);
       setData(res);
     } catch (err: any) {
       setError(err?.message || 'Could not connect to FastAPI backend at http://localhost:8000');
@@ -37,7 +46,7 @@ export default function StressTestScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [caseId]);
 
   useEffect(() => {
     fetchStressTest();
@@ -111,6 +120,10 @@ export default function StressTestScreen() {
               {t.stressTest.disclaimerBody}
             </ThemedText>
           </ThemedView>
+
+          {!caseId && !loading ? (
+            <View style={styles.centerBox}><ThemedText>Create or select a case to run its stress test.</ThemedText></View>
+          ) : null}
 
           {/* Loading State */}
           {loading ? (
