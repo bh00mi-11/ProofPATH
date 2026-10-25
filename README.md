@@ -1,741 +1,149 @@
-# ProofPath
+# ProofPATH
 
-> **From fragmented digital evidence to a traceable, privacy-reviewed incident record.**
+**From fragmented digital evidence to traceable, privacy-reviewed incident records.**
 
-[![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688.svg)](https://fastapi.tiangolo.com/)
-[![React Native](https://img.shields.io/badge/React%20Native-0.74%2B-61DAFB.svg)](https://reactnative.dev/)
-[![Expo](https://img.shields.io/badge/Expo-51%2B-000020.svg)](https://expo.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0%2B-3178C6.svg)](https://www.typescriptlang.org/)
-[![Tests: Pytest](https://img.shields.io/badge/Tests-69%20Passed-success.svg)](backend/tests/)
+ProofPATH is a local-first prototype for documenting online harassment, stalking and digital abuse. It links evidence to user-reviewed observations and claims, surfaces contradictions without guessing, records follow-up actions and creates recipient-aware PDF reports. **An evidence-backed claim is not independently verified truth.**
 
-ProofPath is an evidence-structuring and privacy-controlled disclosure platform designed to help individuals record, link, evaluate, and safely share documentation of repeated online harassment, stalking, and digital abuse. 
+## Contents
 
-Rather than storing unorganized screenshots in camera rolls or relying on error-prone manual notes, ProofPath establishes an auditable, cryptographic evidentiary chain. It connects raw digital artifacts (text exports, messages, images, PDFs) to specific factual statements, verifies data integrity with SHA-256 hashing, checks temporal consistency, and allows counterfactual exploration without altering underlying records.
+1. [Problem and approach](#problem-and-approach)
+2. [Features](#features)
+3. [Architecture](#architecture)
+4. [Example scenario](#example-scenario)
+5. [Local setup](#local-setup)
+6. [Testing](#testing)
+7. [Security and limitations](#security-and-limitations)
+8. [Roadmap](#roadmap)
 
----
+## Problem and approach
 
-## Hosted MVP deployment: Vercel website + Render free API
+Digital abuse evidence is often scattered across screenshots, messages, logs and documents. ProofPATH provides a structured workflow: **Capture → Review → Trace → Challenge → Protect → Act**. Instead of an opaque AI verdict, its deterministic trace engine records why each claim is supported, conflicted, unverified or needs review.
 
-**Website:** https://proofpath-jet.vercel.app (production alias; new branch changes only reach this URL after merge). **Backend:** https://proofpath-v2l4.onrender.com. **Health:** https://proofpath-v2l4.onrender.com/api/health.
+## Features
 
-```text
-Browser -> Vercel (Expo Web frontend)
-                |
-                +-- /api/* rewrite -> Render Free (FastAPI)
-                                       |-- SQLite (ephemeral)
-                                       +-- uploaded files (ephemeral)
-Android app -------------------------> Render Free (FastAPI)
-```
+| Module | MVP behavior |
+| --- | --- |
+| Evidence Vault | Upload files, record metadata and SHA-256 digests, detect duplicates within a case |
+| Observation Review | Propose observations from supported text formats; manually review or add facts |
+| Trace Engine | Link observations to claims as SUPPORTS or CONTRADICTS; explain computed states |
+| Evidence Timeline | Display incident records, artifacts and claim relationships |
+| Time Machine | Simulate removing/disputing evidence without changing the original record |
+| Stress Test | Identify missing support, contradictions and single-source dependencies |
+| Privacy Lens | Preview recipient-specific disclosure fields and redact selected terms |
+| PDF Export | Generate a web PDF after explicit disclosure confirmation |
+| Accountability Trail | Record user-reported actions, status changes, references, attachments and follow-ups |
+| Remedies and Navigator | Offer informational legal context and practical next steps |
+| Guardian / Safety | Prototype quick-disguise and SOS-oriented interaction, not emergency dispatch |
+| Languages | MVP English, Hindi and Marathi interface support |
 
-The browser uses **one Vercel origin**, but FastAPI **runs on Render**, not Vercel. The rewrite in `mobile/vercel.json` forwards API calls to Render. No paid Render Blueprint or credit card is required. For Vercel, set root directory `mobile`, build command `npx expo export --platform web`, and output directory `dist`. Do not override `EXPO_PUBLIC_API_BASE_URL` with an unrelated URL if using the same-origin proxy.
-
-**Existing Render Web Service:** root directory `backend`; build command `pip install -r requirements.txt`; start command `uvicorn app.main:app --host 0.0.0.0 --port $PORT`; health check `/api/health`. Root `render.yaml` is an *optional* free Blueprint with no persistent disk. You do not need to recreate the already-running service.
-
-**Safety:** This public deployment is for fictional cases and synthetic files **only**. Render Free storage is ephemeral: uploaded files and SQLite records may be lost on restart or redeploy. The backend lacks per-user authentication and private evidence access controls. Do not upload real screenshots, identities or incident details. SOS opens the phone dialer and does not automatically alert emergency services.
-
-**Android:** `mobile/eas.json` contains a preview APK profile. Native builds must use `EXPO_PUBLIC_API_BASE_URL=https://proofpath-v2l4.onrender.com` at build time. Native PDF saving/sharing is not implemented and must not be claimed as working.
-
-**Release gate:** Verify health, create a fictional case, upload several synthetic evidence files, inspect the timeline, download a web PDF, and open Remedies. Run backend tests, TypeScript checks and Expo web export before merging the deployment branch. A READY Vercel build alone is not an end-to-end test.
-
----
-
-## Table of Contents
-
-- [Problem Statement](#problem-statement)
-- [What Makes ProofPath Different](#what-makes-proofpath-different)
-- [Core Features](#core-features)
-- [System Architecture](#system-architecture)
-- [Evidence Reasoning Architecture](#evidence-reasoning-architecture)
-- [Complete Walkthrough: Aanya's Scenario](#complete-walkthrough-aanyas-scenario)
-- [Privacy and Security Model](#privacy-and-security-model)
-- [Technology Stack](#technology-stack)
-- [Project Directory Structure](#project-directory-structure)
-- [Installation and Local Development](#installation-and-local-development)
-- [Testing ProofPath on a Physical Mobile Device](#testing-proofpath-on-a-physical-mobile-device)
-- [API Reference](#api-reference)
-- [Testing and Validation](#testing-and-validation)
-- [Known Limitations](#known-limitations)
-- [Future Roadmap](#future-roadmap)
-- [Responsible Use and Legal Disclaimer](#responsible-use-and-legal-disclaimer)
-
----
-
-## Problem Statement
-
-Individuals navigating digital harassment and stalking face severe operational and emotional challenges when attempting to document their experiences:
-
-1. **Fragmented Evidence Across Silos:** Harassment frequently spans messaging apps, SMS, emails, social media, and call logs. Preserving them as raw, disconnected screenshots leads to chronological confusion and missing context.
-2. **Fragile Evidentiary Trails:** Files moved across devices or uploaded to chat apps lose metadata, risk accidental modification, or lack cryptographic proof of preservation.
-3. **Ambiguous and Contradictory Records:** Attackers often manipulate timestamps, delete messages, or send conflicting signals. Without structured cross-examination, survivors struggle to reconcile discrepancies or understand evidentiary gaps.
-4. **All-or-Nothing Disclosure Risk:** When seeking support from friends, counselors, or employers, victims often have no way to share contextual summaries without inadvertently exposing sensitive personal details (e.g., home addresses, phone numbers, medical mentions, or confidential docket numbers).
-5. **Lack of Follow-up Accountability:** After filing complaints or seeking help, tracking formal reference numbers, dates, officer interactions, and required next steps becomes overwhelming during trauma.
-
-ProofPath addresses these challenges by replacing chaotic folders with a structured, verified Directed Acyclic Graph (DAG) linking facts to claims with recipient-aware privacy filters.
-
----
-
-## What Makes ProofPath Different
-
-ProofPath connects the complete evidentiary lifecycle into a unified, transparent pipeline:
-
-$$\textbf{Capture} \longrightarrow \textbf{Trace} \longrightarrow \textbf{Test} \longrightarrow \textbf{Protect} \longrightarrow \textbf{Act}$$
-
-### 1. Traceable Evidence Relationships
-Unlike standard gallery apps or generic notes, ProofPath does not treat evidence as isolated files. Every piece of ingested evidence is tied to atomic *Observations* (extracted facts), which are explicitly linked to *Claims* (factual statements) as supporting or contradictory relations.
-
-### 2. Deterministic and Explainable Assessments
-ProofPath avoids non-deterministic or hallucination-prone AI for legal assessments. Claims are evaluated through an algorithmic rule engine using strict precedence logic. Every status (`SUPPORTED`, `CONFLICTED`, `UNVERIFIED`, `REVIEW_NEEDED`) includes an unambiguous, verifiable explanation pointing directly to the source artifacts.
-
-### 3. Transparent Contradictions
-When timestamps or records conflict (e.g., two logs claiming an event occurred at different times, or an explicit denial), ProofPath surfaces the conflict immediately rather than ignoring it or guessing.
-
-### 4. Reversible Counterfactual Analysis (Time Machine)
-Users can test the fragility of their record using the **Time Machine**. By temporarily toggling evidence sources or observations on or off, users see how their case holds up under scrutiny—without modifying, deleting, or compromising the original underlying files.
-
-### 5. Recipient-Specific Disclosure (Privacy Lens)
-Before sharing an incident summary, ProofPath filters data using strict server-side allowlists tailored for specific audiences (Trusted Contacts, Support Organizations, or Legal Counsel), preventing unintended privacy leaks.
-
-### 6. Actionable Next Steps and Accountability
-ProofPath integrates statutory legal context, remedies, institutional accountability tracking, and discreet safety tools into a cohesive experience.
-
----
-
-## Core Features
-
-**Implementation scope:** The sections below describe the current prototype. Claims of evidence support refer to the relationship between user-recorded observations and uploaded files, **not independent proof of real-world events**. The hosted demo is for synthetic cases only.
-
-
-### 1. Evidence Vault
-- **Purpose:** Securely ingests and registers digital files (screenshots, text files, PDF exports).
-- **Technical Behavior:** Computes SHA-256 cryptographic hashes immediately upon receipt. Rejects duplicate identical uploads (`409 Conflict`) to prevent record inflation and verifies hash matches on retrieval.
-- **User Benefit:** Establishes an immutable record of digital artifacts from day one.
-
-### 2. Observation Review and Linking
-- **Purpose:** Bridges raw documents to specific claims.
-- **Technical Behavior:** Deterministically extracts key parameters (dates, senders, platforms, message snippets) from ingested text artifacts. Users review proposed facts, adjust them if necessary, and assign relationships (`SUPPORTS` or `CONTRADICTS`) to specific statements.
-- **User Benefit:** Eliminates confusion over what each piece of evidence actually demonstrates.
-
-### 3. Deterministic Trace Engine
-- **Purpose:** Computes the evidentiary standing of each claim.
-- **Technical Behavior:** Applies strict deterministic precedence rules across the claim-evidence DAG:
-  1. `REVIEW_NEEDED`: Integrity failure detected (tampered SHA-256 or missing file), OR only contradictory observations exist.
-  2. `CONFLICTED`: Both supporting and contradictory evidence exist, or structured timestamp conflicts are present across active sources.
-  3. `SUPPORTED`: Active supporting observations exist with zero active contradictions or integrity faults.
-  4. `UNVERIFIED`: No active supporting or contradictory links exist.
-- **User Benefit:** Provides clear, explainable feedback on where the record is solid and where documentation is lacking.
-
-### 4. Evidence Time Machine
-- **Purpose:** Counterfactual "what-if" scenario simulation.
-- **Technical Behavior:** Accepts non-destructive overrides to simulate the exclusion of specific artifacts or observations. Recomputes claim states in real time entirely in memory, leaving disk records and hashes untouched.
-- **User Benefit:** Allows survivors and advocates to see what happens if an adversary challenges or discredits a specific piece of evidence.
-
-### 5. Record Stress Test
-- **Purpose:** Evaluates overall case readiness and evidentiary resilience.
-- **Technical Behavior:** Analyzes single-source dependencies, unresolved conflicts, missing dates, unbacked claims, and unsupported statements across the entire incident.
-- **User Benefit:** Flags vulnerabilities before a report is shared with external authorities or attorneys.
-
-### 6. Privacy Lens and Disclosure Compiler
-- **Purpose:** Recipient-aware report generation.
-- **Technical Behavior:** Enforces strict server-side allowlists matching recipient clearance tiers:
-  - **Trusted Contact:** Summary categories, claim text, and verification states. Sensitive identifiers, raw SHA-256 hashes, exact timestamps, and police docket numbers are stripped.
-  - **Support Organization:** Contextual timeline, incident dates, claim text, observation counts, and high-level support status. Raw forensic hashes and agency reference numbers remain withheld.
-  - **Legal Professional:** Formal evidentiary timeline, exact timestamps, observation details, cryptographic SHA-256 proofs, link relationships, and formal accountability trail dockets.
-- **User Benefit:** Eliminates oversharing and safeguards personal privacy when seeking help.
-
-### 7. PDF Incident Reports
-- **Purpose:** Compiles clean, printable multi-page disclosure documents.
-- **Technical Behavior:** Built using ReportLab flowable layouts. Requires explicit user confirmation of settings (`confirmed_config: true`) and scans compiled output to ensure no prohibited fields appear in document text or metadata. Excludes raw image attachments to prevent forensic visual leakage.
-- **User Benefit:** Generates professional documentation ready for legal intake or personal archival.
-
-### 8. Incident Dashboard and Timeline
-- **Purpose:** Unified overview of case progress.
-- **Technical Behavior:** Visualizes the chronological sequence of confirmed facts, unverified statements, active evidence count, and overall verification scores.
-- **User Benefit:** Replaces fragmented notes with a clear, organized chronology.
-
-### 9. Accountability Trail
-- **Purpose:** Tracks external institutional interactions and follow-ups.
-- **Technical Behavior:** Append-only logging of reports filed with police, cyber cells, platform helpdesks, or counselors. Stores reference numbers, officer notes, and next follow-up dates while tracking whether each entry is backed by documentation.
-- **User Benefit:** Ensures vital incident report numbers and deadlines are never misplaced.
-
-### 10. Legal Context and Remedies
-- **Purpose:** Clarifies legal rights under applicable statutory frameworks (such as the Bharatiya Nyaya Sanhita / Information Technology Act).
-- **Technical Behavior:** Maps specific recorded incident types (e.g., cyberstalking, harassment, extortion) to relevant statutory provisions, available protective remedies, and recommended procedural steps.
-- **User Benefit:** Demystifies complex legal procedures for non-lawyers.
-
-### 11. Support and Next-Step Navigator
-- **Purpose:** Guides users through structured safety and reporting options.
-- **Technical Behavior:** Evaluates current case state (e.g., whether emergency threats exist, whether evidence is sufficient) and suggests immediate, medium-term, and long-term actions.
-- **User Benefit:** Reduces cognitive load during high-stress situations.
-
-### 12. Guardian Mode
-- **Purpose:** Discreet privacy and quick exit for physical safety.
-- **Technical Behavior:** One-tap toggle that masks the UI into an innocuous utility or neutral reading screen, immediately hiding sensitive evidence from shoulder surfers or coercive partners.
-- **User Benefit:** Protects users from in-person detection when reviewing evidence in public or shared spaces.
-
-### 13. Multilingual Interface
-- **Purpose:** Broad linguistic accessibility across diverse communities.
-- **Technical Behavior:** Full internationalization architecture supporting English, Hindi (हिन्दी), and Marathi (मराठी) across all UI elements and status badges.
-- **User Benefit:** Empowers users to navigate sensitive safety tools in their primary language.
-
----
-
-## System Architecture
-
-### Deployment Topology
-
-The production **web** interface is served from [Vercel](https://proofpath-jet.vercel.app), while the Python API runs on [Render](https://proofpath-v2l4.onrender.com). Vercel proxies `/api/*` requests to Render. The public demo is **not** a production-grade private evidence store.
+## Architecture
 
 ```mermaid
-flowchart TB
-    A["Desktop browser"] --> C["Vercel • Expo Web frontend"]
-    B["Mobile browser"] --> C
-    C -->|"HTTPS /api/* rewrite"| D["Render • FastAPI backend"]
-    D --> E["Evidence Vault + SHA-256"]
-    D --> F["Claim / Observation Trace Engine"]
-    D --> G["Time Machine + Stress Test"]
-    D --> H["Privacy Lens + ReportLab PDF"]
-    D --> I["Accountability + Remedies + Navigator"]
-    E --> J[("SQLite + uploaded files<br/>Ephemeral on Render Free")]
-    F --> J
-    G --> J
-    H --> J
-    I --> J
+flowchart TD
+    U["React Native / Expo UI<br/>Web or local mobile"] --> R["FastAPI REST API"]
+    R --> V["Evidence Vault<br/>SHA-256 + file validation"]
+    R --> T["Deterministic Trace Engine"]
+    R --> S["Time Machine + Stress Test"]
+    R --> P["Privacy Lens + ReportLab PDF"]
+    R --> A["Accountability + Navigator + Remedies"]
+    V --> D[("SQLite database + local file vault")]
+    T --> D
+    S --> D
+    P --> D
+    A --> D
 ```
 
-**Mobile testing:** Open [the same web URL](https://proofpath-jet.vercel.app) in Chrome or Safari; Expo Go is only necessary for a local native development session. A production APK and native PDF saving/sharing are not claimed as complete.
+**Stack:** React Native, Expo Router, TypeScript, Python, FastAPI, SQLite, ReportLab, Pytest. SQLite is the current database. The diagram shows **local MVP operation**, not a production hosting or security architecture.
 
-
-
-ProofPath is designed with a decoupled architecture: a cross-platform mobile client built on React Native / Expo, communicating via REST with a lightweight, high-performance Python FastAPI backend backed by SQLite.
-
-```mermaid
-graph TD
-    subgraph Client ["Client Layer (Expo / React Native / Web)"]
-        UI["Mobile & Web Interface (TypeScript)"]
-        Nav["Expo Router Navigation"]
-        Ctx["Case & Language State Context"]
-        Guard["Guardian Mode & Safety SOS"]
-        
-        UI --> Nav
-        UI --> Ctx
-        UI --> Guard
-    end
-
-    subgraph API ["REST API Layer (FastAPI)"]
-        Router["FastAPI Application Router"]
-        Health["/api/health"]
-        CaseRoute["/api/cases/*"]
-        ArtRoute["/api/artifacts/*"]
-        ClaimRoute["/api/claims/*"]
-        SimRoute["/api/simulations/*"]
-        DiscRoute["/api/disclosure/*"]
-        AccRoute["/api/accountability/*"]
-    end
-
-    subgraph Services ["Core Processing Engine"]
-        Vault["Evidence Vault & SHA-256 Hashing"]
-        TraceEng["Deterministic Trace Engine (DAG)"]
-        TimeMach["Time Machine Simulator"]
-        StressSvc["Record Stress Test Engine"]
-        Compiler["Disclosure Compiler & PDF Generator"]
-        LegalMap["Legal Context & Remedy Mapper"]
-    end
-
-    subgraph Storage ["Persistent Storage"]
-        DB[(SQLite Database - proofpath.db)]
-        Disk[(Vault File Store - /backend/data/vault/)]
-    end
-
-    %% Connections
-    Ctx -->|HTTP / JSON| Router
-    Router --> CaseRoute
-    Router --> ArtRoute
-    Router --> ClaimRoute
-    Router --> SimRoute
-    Router --> DiscRoute
-    Router --> AccRoute
-
-    ArtRoute --> Vault
-    Vault --> Disk
-    Vault --> DB
-
-    ClaimRoute --> TraceEng
-    SimRoute --> TimeMach
-    SimRoute --> StressSvc
-    DiscRoute --> Compiler
-    AccRoute --> DB
-
-    TraceEng --> DB
-    TimeMach --> TraceEng
-    Compiler --> DB
-```
-
-> **Design Rationale:** React Native with Expo was selected to accelerate cross-platform MVP delivery across mobile devices and desktop browsers. The backend uses Python and FastAPI for fast cryptographic hashing, ReportLab PDF rendering, and deterministic graph analysis. SQLite provides zero-configuration local persistence suitable for rapid evaluation, with clean repository abstraction for production database upgrades.
-
----
-
-## Evidence Reasoning Architecture
-
-ProofPath evaluates factual statements through a deterministic Directed Acyclic Graph (DAG) connecting raw evidence files to claims.
+### Evidence processing
 
 ```mermaid
 flowchart LR
-    A["Raw Evidence Artifact<br/>(File Ingestion + SHA-256)"] --> B["Deterministic Extraction<br/>(Timestamp, Sender, Platform)"]
-    B --> C["User Review & Link<br/>(Assign SUPPORTS / CONTRADICTS)"]
-    C --> D{"Deterministic<br/>Trace Engine"}
-    
-    D -->|Integrity Failure OR Only Contradiction| E["REVIEW_NEEDED"]
-    D -->|Both Support & Contradiction OR Incompatible Times| F["CONFLICTED"]
-    D -->|Active Support & No Contradictions| G["SUPPORTED"]
-    D -->|No Active Links| H["UNVERIFIED"]
-    
-    E --> I["Explainable Assessment & Source Attribution"]
-    F --> I
-    G --> I
-    H --> I
+    F["File + SHA-256"] --> O["Reviewed observation"]
+    O --> L["Claim link"]
+    L --> E{"Rule engine"}
+    E --> SU["SUPPORTED"]
+    E --> CO["CONFLICTED"]
+    E --> UN["UNVERIFIED"]
+    E --> RE["REVIEW_NEEDED"]
+    E --> X["Source-based explanation"]
 ```
 
-### Claim State Precedence Rules
+## Example scenario
 
-| Precedence | Claim State | Condition | Deterministic Reason Provided |
-|:---:|:---|:---|:---|
-| **1 (Highest)** | `REVIEW_NEEDED` | Cryptographic SHA-256 hash mismatch, missing source file, or only contradictory observations exist with zero supporting evidence. | Explicit notice of integrity problem or unbacked contradiction requiring review. |
-| **2** | `CONFLICTED` | Both active supporting and contradictory observations exist, or active supporting sources have irreconcilable timestamp discrepancies. | Explicit citation of the conflicting evidence records and timestamps. |
-| **3** | `SUPPORTED` | One or more active supporting observations exist with zero active contradictions or integrity faults. | Cites the count and IDs of supporting observations. |
-| **4 (Lowest)** | `UNVERIFIED` | Zero active evidence observations are linked to the statement (or all supporting links were excluded in simulation). | Advises that the statement currently lacks backing evidence. |
-
-*Important Clarification:* ProofPath evaluates recorded relationships established by the user and verified by deterministic rules. It does not unilaterally prove forensic authenticity or claim automated detection of all possible real-world contradictions.
-
----
-
-## Complete Walkthrough: Aanya's Scenario
-
-To illustrate the complete workflow, consider the following real-world scenario:
-
-### The Scenario
-**Aanya** has been receiving persistent, unwanted messages from an unknown contact. She explicitly asked the sender to stop, but the sender continued contacting her.
-
-She adds the central claim to ProofPath:
-> *"The sender continued contacting Aanya after she asked them to stop."*
-
-### Synthetic Evidence Set
-1. `01_initial_message.txt` (Oct 18, 2026, 10:15 AM): Sender asks: *"Why are you ignoring me? Reply."*
-2. `02_stop_request.txt` (Oct 18, 2026, 10:20 AM): Aanya replies: *"Please do not contact me again. I do not want to speak with you."*
-3. `03_followup_message.txt` (Oct 19, 2026, 08:40 PM): Sender contacts her again: *"Blocking me won't stop me from contacting you."*
-4. `04_conflicting_record.txt` (Oct 17, 2026, 08:40 PM): A duplicate log entry with a backdated timestamp (claiming the follow-up occurred *before* the stop request).
-
-### End-to-End User Journey
+*Aanya (fictional) receives repeated unwanted messages after asking the sender to stop.*
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor Aanya
-    participant UI as ProofPath App
-    participant Engine as Trace Engine
-    participant TM as Time Machine
-    participant Disc as Privacy Lens
-
-    Aanya->>UI: 1. Create Case & enter initial statement
-    UI->>Engine: Initialize statement (State: UNVERIFIED)
-    Aanya->>UI: 2. Upload 01_initial, 02_stop, and 03_followup
-    UI->>Aanya: Review extracted observations (Dates, Sender, Text)
-    Aanya->>UI: 3. Link 02_stop and 03_followup as SUPPORTS
-    UI->>Engine: Recompute DAG
-    Engine-->>UI: State updates to SUPPORTED (Verified sequence)
-    
-    Aanya->>UI: 4. Upload 04_conflicting_record (Backdated Oct 17)
-    Aanya->>UI: 5. Link 04_conflicting as CONTRADICTS
-    UI->>Engine: Recompute DAG
-    Engine-->>UI: State updates to CONFLICTED (Attributed to 04_conflicting)
-    
-    Aanya->>TM: 6. Open Time Machine & exclude 04_conflicting
-    TM->>Engine: Recalculate simulation with override
-    Engine-->>TM: Simulated State returns to SUPPORTED
-    Aanya->>TM: 7. Restore baseline (preserves original record)
-    
-    Aanya->>Disc: 8. Select "Trusted Contact" export profile
-    Disc->>Aanya: Preview filtered fields (hashes & sensitive IDs stripped)
-    Aanya->>Disc: 9. Confirm & export redacted PDF report
-    Disc-->>Aanya: Multi-page sanitized PDF delivered safely
+    participant App as ProofPATH
+    participant Trace as Trace Engine
+    participant PDF as Privacy Lens
+    Aanya->>App: Create case and upload synthetic messages
+    Aanya->>App: Review dates, messages and sender observations
+    Aanya->>App: Link evidence to continued-contact claim
+    App->>Trace: Recompute claim state
+    Trace-->>Aanya: Supported or conflicted, with source references
+    Aanya->>App: Record user-reported complaint and follow-up
+    Aanya->>PDF: Select recipient and confirm disclosure
+    PDF-->>Aanya: Privacy-reviewed PDF
 ```
 
----
+**Example accountability entry:** “Complaint submitted on 20 October; reference ABC-123; response pending; follow-up due 27 October.” This is **user-reported** unless a separate authorized verification process confirms it.
 
-## Privacy and Security Model
+## Local setup
 
-ProofPath treats user privacy as an active engineering control rather than a policy disclaimer:
+**Backend** (Python 3.10+):
 
-### 1. Evidence Preservation and Cryptographic Hashing
-- Ingested files are stored in an isolated vault directory.
-- SHA-256 hashes are computed on ingestion and checked upon retrieval to ensure files are never modified after storage.
-- Duplicate identical uploads are detected via hash matching and rejected with HTTP `409 Conflict`.
-
-### 2. Strict Server-Side Allowlists
-Data redaction is never performed purely in client-side CSS or UI toggles. The FastAPI backend enforces strict server-side allowlists before data is assembled for preview or PDF compilation:
-
-```
-[Client Request] ──> [Server Allowlist Filter] ──> [PDF Generator] ──> [Sanitized Document]
-```
-
-- **Trusted Contact:** Internal database IDs, raw SHA-256 hashes, exact timestamps, and police docket numbers are completely stripped.
-- **Support Organization:** Retains date context and observation summaries, withholding raw forensic proofs and sensitive reference numbers.
-- **Legal Professional:** Generates a formal evidentiary disclosure including cryptographic hashes, full timeline, and linked accountability provenance.
-
-### 3. Explicit Confirmation Required
-Unconfirmed export requests (`confirmed_config: false`) are rejected with HTTP `400 Bad Request`. Users must explicitly inspect and confirm the privacy preview before a PDF is compiled.
-
-### 4. Cross-Case Link Validation (Not User Authorization)
-Some link operations validate that referenced records belong to the same case. **This does not provide per-user case ownership or secure artifact retrieval.** The public MVP has no completed authentication boundary.
-
-### 5. Clear Boundaries
-- ProofPath does not claim to provide complete anonymity, nor does it guarantee the admissibility of evidence in any specific court.
-- Hashing verifies data integrity against alteration; it does not independently verify the authenticity of real-world events.
-
----
-
-## Technology Stack
-
-| Layer | Technology | Purpose | Selection Rationale |
-|:---|:---|:---|:---|
-| **Mobile & Web UI** | React Native / Expo | Cross-platform frontend application | Enables simultaneous mobile and web support from a single TypeScript codebase. |
-| **Routing** | Expo Router | File-based navigation | Clean, modular page structure with native navigation conventions. |
-| **Language** | TypeScript 5.0+ | Type-safe application development | Ensures compile-time safety across complex evidence models and state. |
-| **Backend API** | Python 3.10+ / FastAPI | High-performance REST service | Native async handling, automatic schema validation, and fast cryptographic operations. |
-| **Evidence Reasoning** | Deterministic DAG Engine | Claim-evidence evaluation | Non-hallucinatory, explainable, and fully auditable decision logic. |
-| **Integrity** | SHA-256 (hashlib) | Tamper-evident record hashing | Standard, collision-resistant cryptographic hash for file integrity. |
-| **Document Generation** | ReportLab 4.0+ | Flowable multi-page PDF compilation | Precise programmatic layout control with strict field allowlist filtering. |
-| **PDF Inspection** | pypdf | PDF text & metadata validation | Used in adversarial privacy testing to verify zero data leakage in generated files. |
-| **Database** | SQLite 3 | Relational metadata persistence | Lightweight, self-contained, and requires zero external database dependencies for local setups. |
-| **Testing** | Pytest / AnyIO | Comprehensive test automation | Flexible test framework covering unit, integration, and security test suites. |
-
----
-
-## Project Directory Structure
-
-```text
-ProofPATH/
-├── backend/
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── accountability.py     # Institutional follow-up & docket logging
-│   │   ├── compiler.py           # Recipient allowlists & PDF generation
-│   │   ├── db.py                 # SQLite initialization & database queries
-│   │   ├── fixture.py            # Synthetic demo data fixtures
-│   │   ├── legal_mapper.py       # Statutory context & remedies mapper
-│   │   ├── main.py               # FastAPI routes & HTTP handlers
-│   │   ├── navigator.py          # Next-step decision support engine
-│   │   ├── remedies.py           # Legal remedies & safety guidance
-│   │   ├── stress_test.py        # Case resilience & single-source auditor
-│   │   ├── trace_engine.py       # Deterministic DAG claim state engine
-│   │   └── vault.py              # File ingestion & SHA-256 verification
-│   ├── data/
-│   │   └── vault/                # Secure file storage (.gitkeep preserved)
-│   ├── tests/
-│   │   ├── test_accountability_trail.py
-│   │   ├── test_adversarial_privacy.py      # P0 privacy leak validation
-│   │   ├── test_backend.py                  # Core backend endpoints
-│   │   ├── test_comparative_benchmark.py    # 15-scenario technical benchmark
-│   │   ├── test_evidence_workflow.py        # Ingestion & linking lifecycle
-│   │   ├── test_failure_modes.py            # Negative path resilience tests
-│   │   ├── test_guardian_mode.py            # Safety disguise logic
-│   │   ├── test_legal_context_mapper.py     # Statutory mappings
-│   │   ├── test_localization.py             # Language support verification
-│   │   ├── test_next_step_navigator.py      # Support recommendations
-│   │   ├── test_pdf_export_regression.py    # PDF layout & filtering
-│   │   ├── test_remedies.py                 # Remedies endpoints
-│   │   └── test_sprint5_verification.py     # End-to-end integration tests
-│   ├── pytest.ini
-│   └── requirements.txt          # Python dependencies
-├── mobile/
-│   ├── src/
-│   │   ├── app/                  # Expo Router screens
-│   │   │   ├── _layout.tsx       # Root layout & navigation providers
-│   │   │   ├── index.tsx         # Incident Dashboard & Case Summary
-│   │   │   ├── evidence.tsx      # Evidence Vault & Observation Review
-│   │   │   ├── time-machine.tsx  # Counterfactual Scenario Simulator
-│   │   │   ├── privacy.tsx       # Share Safely & PDF Export Preview
-│   │   │   ├── accountability.tsx# Follow-up Tracker & Docket Log
-│   │   │   ├── guardian.tsx      # Guardian Mode quick-disguise screen
-│   │   │   ├── support.tsx       # Next-Step Navigator & Resources
-│   │   │   ├── stress-test.tsx   # Record Stress Test audit screen
-│   │   │   ├── claim/[id].tsx    # Statement Detail & Linking View
-│   │   │   └── incident/[id].tsx # Incident Detail View
-│   │   ├── components/           # Reusable UI widgets & status badges
-│   │   ├── context/              # CaseContext & LanguageContext
-│   │   ├── i18n/                 # Localization (en, hi, mr)
-│   │   ├── services/             # API clients & data transformers
-│   │   └── types/                # TypeScript interfaces & enums
-│   ├── app.json                  # Expo application configuration
-│   ├── package.json              # Frontend npm dependencies
-│   └── tsconfig.json             # TypeScript configuration
-├── .gitignore
-├── API_CONTRACT.md               # API schema & contract specification
-└── README.md                     # Complete product documentation
-```
-
----
-
-## Installation and Local Development
-
-### Prerequisites
-- **Python:** 3.10 or higher
-- **Node.js:** 18.0 or higher (with `npm`)
-- **Git**
-
-### 1. Clone the Repository
 ```bash
-git clone https://github.com/bh00mi-11/ProofPATH.git
-cd ProofPATH
-```
-
-### 2. Backend Setup
-
-#### On Windows (PowerShell):
-```powershell
 cd backend
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+# Activate .venv for your OS
 pip install -r requirements.txt
+python -m uvicorn app.main:app --reload
 ```
 
-#### On Linux / macOS:
-```bash
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+**Frontend** (Node.js 18+), in another terminal:
 
-#### Start the FastAPI Server:
-```bash
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
-```
-*Verify backend health by opening `http://127.0.0.1:8000/api/health`.*
-
-### 3. Frontend Setup
-
-In a new terminal window:
 ```bash
 cd mobile
 npm install
-```
-
-#### Start Expo Web Development:
-```bash
 npm run web
 ```
-The application will launch in your browser at `http://localhost:8081`.
 
----
+Open the local Expo URL printed in the terminal. For a phone on the same Wi-Fi network, configure `EXPO_PUBLIC_API_BASE_URL` to your computer's reachable LAN address (for example `http://192.168.1.10:8000`), start FastAPI with `--host 0.0.0.0`, and run Expo locally. The sample IP must be replaced with your actual LAN IP.
 
-## Testing ProofPath on a Physical Mobile Device
+## Testing
 
-### Running ProofPath on Your Phone (Local Network)
-
-To run the application on a real mobile device, both your development laptop and your phone must be connected to the **same local Wi-Fi network**.
-
-```
-[ Development Laptop ] ──────── (Same Wi-Fi Network) ──────── [ Physical Phone ]
-  Runs FastAPI (:8000)                                          Runs Expo Web / Expo App
-  Runs Expo (:8081)
-```
-
-#### Step 1 — Find Your Laptop's Local IP Address
-- **On Windows (PowerShell):**
-  ```powershell
-  ipconfig
-  ```
-  Locate your active Wi-Fi adapter's **IPv4 Address** (e.g., `192.168.1.105`).
-- **On macOS / Linux:**
-  ```bash
-  ifconfig | grep "inet " | grep -v 127.0.0.1
-  ```
-
-#### Step 2 — Start FastAPI Bound to All Interfaces
-Start the backend bound to `0.0.0.0` so it accepts connections from other devices on your local network:
 ```bash
-cd backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-*(Note: `0.0.0.0` tells the server to bind to all network adapters; your phone will connect to your laptop's specific LAN IP).*
-
-#### Step 3 — Configure the Frontend API URL
-The mobile app reads its backend target from `EXPO_PUBLIC_API_BASE_URL`.
-
-Create or edit `mobile/.env`:
-```env
-EXPO_PUBLIC_API_BASE_URL=http://192.168.1.105:8000
-```
-*(Replace `192.168.1.105` with your laptop's actual IPv4 address).*
-
-#### Step 4 — Start Expo
-```bash
-cd mobile
-npx expo start --clear
-```
-- **Web on Mobile Browser:** You can directly open `http://192.168.1.105:8081` in Chrome or Safari on your phone.
-- **Expo Go App:** Scan the QR code displayed in your terminal using the Expo Go app (Android) or Camera app (iOS).
-
-#### Step 5 — Verify Connectivity
-On your phone's browser, test the backend directly:
-```text
-http://192.168.1.105:8000/api/health
-```
-If this returns `{"status": "ok", "service": "ProofPath Backend"}`, your network connection is operating correctly.
-
-#### Mobile Troubleshooting Tips
-- **Windows Firewall:** If your phone cannot connect, verify that Windows Defender Firewall allows incoming connections on port `8000` for **Private Networks**.
-- **AP Isolation:** Public, guest, or university Wi-Fi networks often enable "Client Isolation," preventing devices from seeing each other. If this occurs, test using a personal phone hotspot.
-- **Restart Expo:** Always restart your Expo server with `--clear` after modifying `.env` variables.
-
----
-
-## API Reference
-
-The FastAPI backend exposes the following REST endpoints:
-
-### Health & System
-| Method | Path | Description |
-|:---|:---|:---|
-| `GET` | `/api/health` | Service health check and status. |
-
-### Case Management
-| Method | Path | Description |
-|:---|:---|:---|
-| `POST` | `/api/cases` | Initializes a new incident case record with optional initial claim. |
-| `GET` | `/api/cases/{case_id}` | Retrieves full case details, claims, and linked artifacts. |
-
-### Evidence Vault
-| Method | Path | Description |
-|:---|:---|:---|
-| `POST` | `/api/artifacts/upload?case_id={id}` | Ingests a digital file, computes SHA-256, and checks deduplication. |
-| `GET` | `/api/artifacts/{id}/content?case_id={id}` | Returns verified file content and cryptographic integrity status. |
-| `GET` | `/api/artifacts/{id}/proposals?case_id={id}` | Deterministically extracts facts from the uploaded document. |
-
-### Claims & Trace Engine
-| Method | Path | Description |
-|:---|:---|:---|
-| `POST` | `/api/claims/link?case_id={id}` | Links an extracted observation to a claim (`SUPPORTS` or `CONTRADICTS`). |
-| `GET` | `/api/claims/{claim_id}/trace?case_id={id}` | Evaluates claim standing and returns deterministic explanation. |
-
-### Time Machine & Simulation
-| Method | Path | Description |
-|:---|:---|:---|
-| `POST` | `/api/simulations/recompute` | Accepts counterfactual overrides and simulates claim states in-memory. |
-| `GET` | `/api/cases/{id}/stress-test` | Analyzes evidence fragility and flags unbacked or conflicting claims. |
-
-### Privacy Lens & PDF Export
-| Method | Path | Description |
-|:---|:---|:---|
-| `POST` | `/api/disclosure/preview` | Returns server-side allowlisted preview for a specified recipient profile. |
-| `POST` | `/api/export/pdf` | Compiles a privacy-filtered PDF report (requires `confirmed_config: true`). |
-
-### Accountability & Legal Context
-| Method | Path | Description |
-|:---|:---|:---|
-| `POST` | `/api/cases/{id}/accountability/entries`| Logs a formal institutional action (police complaint, platform ticket). |
-| `GET` | `/api/cases/{id}/accountability` | Retrieves the append-only institutional accountability timeline. |
-| `GET` | `/api/legal-context/{category}` | Returns statutory provisions and legal remedies for an incident type. |
-| `GET` | `/api/navigator/next-steps?case_id={id}`| Returns dynamic recommendations based on case readiness. |
-
-*Interactive Swagger documentation is available at `http://localhost:8000/docs` when running in development.*
-
----
-
-## Testing and Validation
-
-ProofPath includes backend tests covering core logic, hashing, privacy filtering and negative paths. The previously recorded results below are historical; this README edit does not represent a fresh CI or deployment verification.
-
-### Running Backend Tests
-From the `backend/` directory:
-```bash
-pytest -v
+cd backend && pytest -v
+cd ../mobile && npx tsc --noEmit
 ```
 
-### Previously Recorded Test Results (not re-run for this documentation update)
-```text
-============================= test session starts =============================
-platform win32 -- Python 3.13.9, pytest-9.1.1
-collected 69 items
+The project previously recorded 69 passing backend tests; **this README revision does not claim a fresh test run**. Demo with fictional cases: upload evidence → review observations → link claim → run simulation → record follow-up → preview and export PDF.
 
-tests/test_accountability_trail.py .......                               [ 10%]
-tests/test_adversarial_privacy.py .                                      [ 11%]
-tests/test_backend.py ......................                             [ 43%]
-tests/test_comparative_benchmark.py .                                    [ 44%]
-tests/test_evidence_workflow.py .                                        [ 46%]
-tests/test_failure_modes.py .                                            [ 47%]
-tests/test_guardian_mode.py ..                                           [ 50%]
-tests/test_legal_context_mapper.py ......                                [ 59%]
-tests/test_localization.py ...                                           [ 63%]
-tests/test_next_step_navigator.py ......                                 [ 72%]
-tests/test_pdf_export_regression.py .......                              [ 82%]
-tests/test_remedies.py ....                                              [ 88%]
-tests/test_sprint5_verification.py ........                              [100%]
+## Security and limitations
 
-============================= 69 passed in 14.73s =============================
-```
+- **The current `main` MVP does not include working login, registration, admin accounts or backend-enforced per-user case ownership.** Do not enter real identifying details or genuine abuse evidence.
+- SHA-256 is a file-integrity check, not proof of authenticity, authorship or legal admissibility.
+- An Accountability Trail entry, attached document or `DOCUMENT_SUPPORTED` state **does not mean a police officer, platform or institution verified the action**.
+- Text extraction has format limitations; screenshot OCR is not guaranteed. Native PDF saving/sharing is incomplete.
+- SQLite and the local file vault are appropriate for a controlled demo, not a production multi-user sensitive-data service.
+- The tool does not replace legal advice or emergency services.
 
-### Running Frontend Typechecks
-From the `mobile/` directory:
-```bash
-npx tsc --noEmit
-```
-*Result: Clean compilation with 0 type errors.*
+## Roadmap
 
-### Benchmark Summary (Comparative Evaluation)
-Evaluated across 15 synthetic test scenarios comparing ProofPath's Deterministic Trace Engine with a standard flat chronological timeline:
-- **Relationship Attribution:** ProofPath 19/19 (100%) vs Baseline 0/19 (0% — baseline lacks a claim DAG).
-- **Contradiction Surfacing:** ProofPath 5/5 (100%) vs Baseline 0/5 (0% — baseline lacks conflict resolution logic).
-- **False Contradiction Rate:** 0.0% (Zero false alerts generated).
-- **Unsupported Claim Detection:** ProofPath 4/4 (100%) vs Baseline 0/4 (0% — baseline cannot identify unbacked claims).
+**Next engineering phase, separate from the stable MVP:**
 
----
+- [ ] Secure user registration/login/logout, session expiry and password reset
+- [ ] Backend case ownership and authorization on every evidence, claim, download, export and accountability route
+- [ ] Role-based admin interface with explicit assignment, least privilege and audit logs
+- [ ] **Verified Accountability:** preserve user-reported entries; allow an authorized reviewer to verify or reject a particular entry with attributable evidence and an append-only decision history
+- [ ] Automated cross-user isolation, authentication, role and privacy tests
+- [ ] Encrypted durable storage, backup/retention controls and improved native mobile export
 
-## Known Limitations
+**Principle:** Show user-reported claims separately from independently verified facts; never turn a self-reported action into an official status merely because a document was attached.
 
-**Public MVP privacy boundary:** The current deployment has no implemented user login or private per-user evidence authorization. Render Free uses ephemeral SQLite and local uploaded-file storage, which can be lost during service restarts or redeploys. **Never upload real personal evidence, identifying information or incident reports to the public demo.** Accountability records are user-entered and are not confirmation by police or other institutions.
+## Responsible use
 
-
-While ProofPath provides robust evidence structuring, users and developers should be aware of current MVP boundaries:
-
-1. **Deterministic Text Extraction Scope:** Automated fact extraction is optimized for structured message exports, chat logs, and plain text. Handwritten documents or low-resolution images require user review and manual transcription.
-2. **User-Guided Relationship Assignment:** The system relies on the user to review proposed facts and link them as supporting or contradictory. It does not replace human judgment.
-3. **No Independent Authenticity Guarantee:** SHA-256 cryptographic hashing guarantees *tamper-evidence* (the file has not been altered since ingestion); it does not prove that the underlying events in the screenshots actually occurred.
-4. **Court Admissibility Varies:** While ProofPath follows sound evidentiary principles (hash integrity, clear provenance, non-destructive simulation), formal legal admissibility depends on local jurisdictional statutes (e.g., Section 65B of the Indian Evidence Act / Section 63 of the BSA) and judicial discretion.
-5. **No Automatic Emergency Dispatch:** ProofPath is a documentation tool. Triggering SOS opens dialer shortcuts (`112`) but does not automatically dispatch law enforcement.
-
----
-
-## Future Roadmap
-
-### Identity, Access Control and Verified Accountability (Planned)
-
-The current `main` branch deliberately ships **without login, registration, admin accounts or per-user case ownership**. An experimental authentication implementation is isolated on a separate development branch and is **not production-ready**. These capabilities are future work, not demo features.
-
-- [ ] **User accounts:** Secure registration, sign-in, sign-out, password reset, session expiry, rate limiting and session revocation.
-- [ ] **Backend case ownership:** Enforce authorization for every case, artifact, claim, observation, download, disclosure, export and accountability endpoint; add cross-user access-denial tests.
-- [ ] **Admin interface:** Dedicated, least-privilege admin roles, controlled case assignment, consent boundaries and an auditable record of each action. Admins must not automatically have unrestricted access to survivor evidence.
-- [ ] **Verified accountability:** Distinguish `USER_REPORTED` institutional interactions from independently `VERIFIED` updates, including verifier identity, linked documents, timestamps and append-only status history.
-- [ ] **Durable and private storage:** Replace ephemeral free-host SQLite/file storage with encrypted persistent infrastructure, retention/deletion controls, backup and recovery.
-- [ ] **Release validation:** Full authentication and authorization regression tests, PDF privacy inspection, web/native behavior checks and end-to-end synthetic scenario tests.
-
-### Additional Enhancements
-
-
-
-Authentication, admin roles, case ownership, durable storage and security tests are the **highest-priority future release gates** (see the near-future section above). Additional improvements planned for future production versions:
-
-- [ ] **Multi-Format OCR Pipeline:** Integrating local, privacy-preserving OCR for automated fact extraction from screenshots.
-- [ ] **Cryptographic Signing (Ed25519):** Adding hardware-backed cryptographic signatures to seal case archives at specific points in time.
-- [ ] **End-to-End Encrypted Sync:** Supporting zero-knowledge encrypted cloud backups using client-side encryption keys.
-- [ ] **Decentralized Time-Stamping:** Anchoring case archive hashes to public ledgers or certified RFC 3161 timestamp authorities.
-- [ ] **Native Screen-Reader Optimization:** Enhancing VoiceOver and TalkBack auditory labels across the mobile application.
-
----
-
-## Responsible Use and Legal Disclaimer
-
-ProofPath is designed to empower individuals with structured record-keeping, decision support, and privacy-reviewed sharing.
-
-> **CRITICAL NOTICE:** ProofPath is **not a replacement for legal counsel, formal law enforcement investigation, or emergency services**. If you are in immediate physical danger, contact your local emergency services (112 in India, 911 in the US) or a certified crisis hotline immediately.
+ProofPATH is a prototype for structured documentation and decision support. It cannot authenticate real-world events, certify legal evidence or contact emergency responders automatically. Use synthetic data while access controls remain incomplete.
