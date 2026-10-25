@@ -1,3 +1,4 @@
+import type { Href } from 'expo-router';
 import React, { useMemo } from 'react';
 import { StyleSheet, ScrollView, View, Pressable, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -100,7 +101,7 @@ export default function TimeMachineScreen() {
             </View>
             <Pressable
               style={styles.modeTab}
-              onPress={() => router.push('/stress-test')}
+              onPress={() => router.push('/stress-test' as Href)}
             >
               <ThemedText type="smallBold" style={styles.modeTabTextInactive}>
                 🔬 Quick Consistency Check (5-Point) →
