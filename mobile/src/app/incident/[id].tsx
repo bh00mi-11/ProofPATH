@@ -128,13 +128,18 @@ export default function IncidentDetailsScreen() {
             </Pressable>
           </View>
 
+          <ThemedView type="backgroundElement" style={styles.overviewCard}>
+            <ThemedText type="subtitle">How to understand your records</ThemedText>
+            <ThemedText type="small" style={styles.descriptionText}>1. Save a message or file.\n2. Connect recorded details to a statement.\n3. See which details support it or disagree.\n4. Review uncertainties before sharing. These results are not legal findings.</ThemedText>
+          </ThemedView>
+
           {/* Associated Claims Section */}
           <View style={styles.sectionHeaderRow}>
             <ThemedText type="smallBold" style={styles.sectionHeader}>
               STATEMENTS ({claims.length})
             </ThemedText>
             <ThemedText type="small" style={styles.sectionSub}>
-              Review status based on saved evidence
+              Based on linked records, not a legal verdict
             </ThemedText>
           </View>
 
@@ -188,7 +193,7 @@ export default function IncidentDetailsScreen() {
 
                   <View style={styles.cardFooter}>
                     <ThemedText type="smallBold" style={styles.viewMoreText}>
-                      Review details and matching evidence →
+                      Understand this result and view linked evidence →
                     </ThemedText>
                   </View>
                 </ThemedView>
