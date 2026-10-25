@@ -23,6 +23,9 @@ export default function AppTabs() {
       tabBarStyle: { backgroundColor: Colors.light.backgroundElement, height: 66, paddingBottom: 8, paddingTop: 6 },
       tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
     }}>
+      {['accountability', 'claim/[id]', 'explore', 'guardian', 'incident/[id]', 'incident/create', 'legal-context', 'remedies', 'report/preview', 'stress-test'].map((name) => (
+        <Tabs.Screen key={name} name={name} options={{ href: null }} />
+      ))}
       {items.map((item) => (
         <Tabs.Screen key={item.name} name={item.name} options={{
           title: item.title,
