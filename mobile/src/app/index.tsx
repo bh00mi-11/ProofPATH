@@ -46,10 +46,10 @@ export default function HomeScreen() {
         <View style={styles.emergencyRibbon}>
           <View style={styles.emergencyLeft}>
             <View style={styles.emergencyBadge}>
-              <ThemedText style={styles.emergencyBadgeText}>RAPID DISPATCH & SAFETY</ThemedText>
+              <ThemedText style={styles.emergencyBadgeText}>EMERGENCY HELP</ThemedText>
             </View>
             <ThemedText style={styles.emergencyText}>
-              In immediate physical danger? Tap for emergency dispatch or discreet guardian protection.
+              In immediate danger, call 112. Guardian Mode records check-ins but does not automatically notify police or contacts.
             </ThemedText>
           </View>
           <View style={styles.emergencyActions}>
@@ -88,14 +88,14 @@ export default function HomeScreen() {
           <View style={styles.heroContent}>
             <View style={styles.categoryPill}>
               <ThemedText style={styles.categoryPillText}>
-                DETERMINISTIC INCIDENT CONTINUITY
+                YOUR STORY, YOUR CONTROL
               </ThemedText>
             </View>
             <ThemedText type="display" style={styles.heroTitle}>
-              Document Safely. Preserve Truth. Take Control.
+              Your evidence. Your story. Your control.
             </ThemedText>
             <ThemedText style={styles.heroSubtitle}>
-              {t.home.tagline}
+              Save what happened, understand what your records show, and decide what to share.
             </ThemedText>
 
             <View style={styles.heroCtaRow}>
@@ -169,7 +169,7 @@ export default function HomeScreen() {
 
             <View style={styles.integrityBadge}>
               <ThemedText style={styles.integrityText}>
-                🔒 SHA-256 integrity checks verified on-device
+                View saved file integrity details in Evidence Vault
               </ThemedText>
             </View>
           </View>
@@ -189,10 +189,10 @@ export default function HomeScreen() {
         <View style={styles.pillarsSection}>
           <View style={styles.sectionHeader}>
             <ThemedText type="headline" style={styles.sectionTitle}>
-              Four Pillars of Documented Safety
+              Your next steps
             </ThemedText>
             <ThemedText style={styles.sectionDescription}>
-              Engineered for absolute confidentiality, deterministic validation, and safe institutional reporting.
+              Save evidence, review what it shows, share carefully, and find support.
             </ThemedText>
           </View>
 

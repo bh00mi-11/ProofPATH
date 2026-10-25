@@ -120,7 +120,7 @@ export function EvidenceTimelineCard({
               </ThemedText>
               {observations.length > 1 ? (
                 <ThemedText style={styles.previewDocSubtitle}>
-                  + {observations.length - 1} additional recorded fact{observations.length > 2 ? 's' : ''} in timeline
+                  + {observations.length - 1} additional recorded detail{observations.length > 2 ? 's' : ''} in timeline
                 </ThemedText>
               ) : null}
               <View style={styles.previewWatermark}>
@@ -139,7 +139,7 @@ export function EvidenceTimelineCard({
                   No observations or facts recorded for this artifact yet
                 </ThemedText>
                 <ThemedText type="small" style={styles.noFactsSub}>
-                  Original file is stored tamper-evident in the vault with verified SHA-256 hash.
+                  The original file and its saved SHA-256 fingerprint can be reviewed in the vault.
                 </ThemedText>
               </View>
             </View>
@@ -254,7 +254,7 @@ export function EvidenceTimelineCard({
                     <View style={styles.obsMeta}>
                       <View style={styles.obsBadgeAndField}>
                         <ThemedText type="smallBold" style={styles.obsId}>
-                          Fact #{obs.id}
+                          Recorded detail
                         </ThemedText>
                         {obs.field ? (
                           <View style={styles.obsFieldTag}>
@@ -306,7 +306,7 @@ export function EvidenceTimelineCard({
                         {isLinkingThis && (
                           <View style={styles.claimSelectionDrawer}>
                             <ThemedText type="smallBold" style={styles.drawerTitle}>
-                              Connect Detail #{obs.id} to Statement:
+                              Connect this detail to a statement:
                             </ThemedText>
                             {claims.map((clm) => (
                               <View key={clm.id} style={styles.claimOptionItem}>
