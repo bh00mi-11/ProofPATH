@@ -40,92 +40,6 @@ The browser uses **one Vercel origin**, but FastAPI **runs on Render**, not Verc
 
 ---
 
-## Release status — recHERsion'26 (25 October 2026)
-
-**Submission branch:** `main` | **Scope:** pre-authentication demonstration MVP | **Audience:** fictional/synthetic evidence only.
-
-**Hosted web app:** https://proofpath-jet.vercel.app (Expo Web on Vercel). **API:** https://proofpath-v2l4.onrender.com (FastAPI on Render Free). The browser uses a Vercel `/api/*` rewrite to the Render API. This is **not an all-Vercel deployment**. The deployed revision and availability should be checked separately; merging GitHub code does not prove the production URL updated.
-
-### Feature inventory and implementation status
-
-| Capability | Status in `main` | Implementation boundary |
-| --- | --- | --- |
-| Case creation, incident overview and timeline | Implemented | Public demo lacks user-specific isolation |
-| Evidence upload, multi-file selection and SHA-256 hashing | Implemented | Multiple files are submitted sequentially; hashing is not proof that an incident occurred |
-| Observation proposals and manual review | Implemented | Text-oriented extraction; image OCR is not guaranteed |
-| Claims, support/contradiction links and explainable trace states | Implemented | Rules evaluate recorded relationships, not legal truth |
-| Non-destructive scenario simulation (Time Machine) | Implemented | Simulated results do not modify originals |
-| Record stress testing | Implemented | Flags gaps and fragile dependencies |
-| Privacy Lens disclosure preview and recipient field allowlists | Implemented | Not a substitute for access control or a production privacy audit |
-| Web PDF report export | Implemented; previously tested in hosted browser | Native APK PDF saving/sharing is not complete |
-| Accountability Trail: user-entered actions, statuses, references, linked evidence, follow-up dates and completion | Implemented | Entries are user-reported; attachment support does **not** mean an authority confirmed the event |
-| Legal context, remedies and next-step navigator | Implemented | Informational only; not personalized legal advice |
-| Guardian contacts / SOS-oriented UI | Prototype | No automatic emergency dispatch; personal-data protections are incomplete |
-| English, Hindi and Marathi interface support | Implemented at MVP level | Translation and accessibility coverage require review |
-| Login, registration and secure sessions | **Not in `main`** | Experimental code exists on a separate development branch; not production-ready |
-| Admin login, admin dashboard and role-specific workflows | **Planned** | No independently verified official actions |
-| Backend-enforced case ownership and private evidence access | **Not in `main`** | Do not upload genuine private evidence |
-| Persistent production database and encrypted durable evidence storage | **Planned** | Render Free SQLite and file vault are ephemeral |
-| Android APK distribution and native PDF share | **Not verified/completed** | The phone-browser experience is available via Vercel |
-
-### Final deployed architecture
-
-```text
-Phone Chrome / Safari                  Desktop browser
-          \                              /
-           \                            /
-              Vercel: Expo Web / React Native UI
-              - Expo Router screens
-              - CaseContext + LanguageContext
-              - Evidence, Trace, Time Machine, Privacy, Accountability,
-                Remedies, Support and Guardian interfaces
-                           |
-                      HTTPS /api/*
-                           |
-                  Vercel rewrite proxy
-                           |
-                  Render Free: FastAPI
-                  - Cases and evidence APIs
-                  - File ingest + SHA-256 vault
-                  - Observations, claim links and trace rules
-                  - Scenario and stress-test engines
-                  - Disclosure allowlists + ReportLab PDF
-                  - Accountability, legal context and navigator
-                           |
-                 SQLite + local file vault
-                 (ephemeral on free hosting)
-
-Expo Go / native development app -> Render API directly
-(no production APK or native PDF export claimed)
-```
-
-**Evidence-processing sequence:** Create fictional case → upload synthetic evidence → review observations → add claims and evidence links → inspect `SUPPORTED`, `CONFLICTED`, `UNVERIFIED` or `REVIEW_NEEDED` explanations → optionally simulate excluded evidence → inspect stress test → record a user-reported institutional action and follow-up → preview recipient disclosure → explicitly confirm → export PDF on web.
-
-**Accountability provenance:** An entry records what a user says they did, when they say they did it, its reference number, optional attached document, status and next follow-up. A linked document may support the report, but **neither the entry nor the attachment represents police, platform or institutional verification**. Future admin workflows must keep user-reported and independently verified events visibly separate and record who made each change.
-
-### Near-future implementation: authentication, admin and privacy hardening
-
-These are **not part of the submitted pre-login MVP**:
-
-1. **User identity:** Registration, sign-in/sign-out, password reset, session expiry, rate limiting and safe session storage; do not ship the experimental development-branch implementation without security review.
-2. **Case ownership:** Every case, claim, observation, artifact, download, scenario, disclosure, PDF and accountability endpoint must verify the authenticated user's access on the server. Include negative cross-account and IDOR tests.
-3. **Admin role:** Provisioned admin accounts, least-privilege access, explicit case-assignment/consent policy, separate admin views, actor attribution and audit history. Admins must not automatically have unrestricted access to survivor records.
-4. **Accountability verification:** User-created records stay `USER_REPORTED`; authorized verification must be a distinct, attributable action with documented evidence and an append-only history.
-5. **Private data infrastructure:** Durable database and file storage, encryption, backups, deletion/retention policies, secure logging, malware/file-type checks and redaction validation of exported documents.
-6. **Release gate:** Test registration, login, logout, expiry, account A/B isolation, cross-case artifact access, PDF privacy, mobile/web navigation, regression coverage and a full synthetic end-to-end workflow before production deployment.
-
-**Security warning:** SHA-256 detects post-ingestion changes to stored bytes; it does not authenticate uploaders, prove real-world facts, guarantee evidence confidentiality or provide legal certification. The current public demonstration must use **fictional cases only**.
-
-### Demo and submission checklist
-
-- Open the Vercel website in a desktop browser and phone browser.
-- Verify the Render `/api/health` endpoint.
-- Demonstrate a complete fictional evidence-to-PDF workflow, including traceability and a user-reported Accountability Trail entry.
-- Submit repository, PPT and demo video. Login is **not** an implemented feature and must not be represented as such.
-- No commits to the submitted repository after **25 October 2026, 9:00 PM IST**, per the recHERsion'26 rulebook.
-
----
-
 ## Table of Contents
 
 - [Problem Statement](#problem-statement)
@@ -188,6 +102,9 @@ ProofPath integrates statutory legal context, remedies, institutional accountabi
 ---
 
 ## Core Features
+
+**Implementation scope:** The sections below describe the current prototype. Claims of evidence support refer to the relationship between user-recorded observations and uploaded files, **not independent proof of real-world events**. The hosted demo is for synthetic cases only.
+
 
 ### 1. Evidence Vault
 - **Purpose:** Securely ingests and registers digital files (screenshots, text files, PDF exports).
@@ -264,6 +181,31 @@ ProofPath integrates statutory legal context, remedies, institutional accountabi
 ---
 
 ## System Architecture
+
+### Deployment Topology
+
+The production **web** interface is served from [Vercel](https://proofpath-jet.vercel.app), while the Python API runs on [Render](https://proofpath-v2l4.onrender.com). Vercel proxies `/api/*` requests to Render. The public demo is **not** a production-grade private evidence store.
+
+```mermaid
+flowchart TB
+    A["Desktop browser"] --> C["Vercel • Expo Web frontend"]
+    B["Mobile browser"] --> C
+    C -->|"HTTPS /api/* rewrite"| D["Render • FastAPI backend"]
+    D --> E["Evidence Vault + SHA-256"]
+    D --> F["Claim / Observation Trace Engine"]
+    D --> G["Time Machine + Stress Test"]
+    D --> H["Privacy Lens + ReportLab PDF"]
+    D --> I["Accountability + Remedies + Navigator"]
+    E --> J[("SQLite + uploaded files<br/>Ephemeral on Render Free")]
+    F --> J
+    G --> J
+    H --> J
+    I --> J
+```
+
+**Mobile testing:** Open [the same web URL](https://proofpath-jet.vercel.app) in Chrome or Safari; Expo Go is only necessary for a local native development session. A production APK and native PDF saving/sharing are not claimed as complete.
+
+
 
 ProofPath is designed with a decoupled architecture: a cross-platform mobile client built on React Native / Expo, communicating via REST with a lightweight, high-performance Python FastAPI backend backed by SQLite.
 
@@ -752,6 +694,9 @@ Evaluated across 15 synthetic test scenarios comparing ProofPath's Deterministic
 
 ## Known Limitations
 
+**Public MVP privacy boundary:** The current deployment has no implemented user login or private per-user evidence authorization. Render Free uses ephemeral SQLite and local uploaded-file storage, which can be lost during service restarts or redeploys. **Never upload real personal evidence, identifying information or incident reports to the public demo.** Accountability records are user-entered and are not confirmation by police or other institutions.
+
+
 While ProofPath provides robust evidence structuring, users and developers should be aware of current MVP boundaries:
 
 1. **Deterministic Text Extraction Scope:** Automated fact extraction is optimized for structured message exports, chat logs, and plain text. Handwritten documents or low-resolution images require user review and manual transcription.
@@ -763,6 +708,21 @@ While ProofPath provides robust evidence structuring, users and developers shoul
 ---
 
 ## Future Roadmap
+
+### Identity, Access Control and Verified Accountability (Planned)
+
+The current `main` branch deliberately ships **without login, registration, admin accounts or per-user case ownership**. An experimental authentication implementation is isolated on a separate development branch and is **not production-ready**. These capabilities are future work, not demo features.
+
+- [ ] **User accounts:** Secure registration, sign-in, sign-out, password reset, session expiry, rate limiting and session revocation.
+- [ ] **Backend case ownership:** Enforce authorization for every case, artifact, claim, observation, download, disclosure, export and accountability endpoint; add cross-user access-denial tests.
+- [ ] **Admin interface:** Dedicated, least-privilege admin roles, controlled case assignment, consent boundaries and an auditable record of each action. Admins must not automatically have unrestricted access to survivor evidence.
+- [ ] **Verified accountability:** Distinguish `USER_REPORTED` institutional interactions from independently `VERIFIED` updates, including verifier identity, linked documents, timestamps and append-only status history.
+- [ ] **Durable and private storage:** Replace ephemeral free-host SQLite/file storage with encrypted persistent infrastructure, retention/deletion controls, backup and recovery.
+- [ ] **Release validation:** Full authentication and authorization regression tests, PDF privacy inspection, web/native behavior checks and end-to-end synthetic scenario tests.
+
+### Additional Enhancements
+
+
 
 Authentication, admin roles, case ownership, durable storage and security tests are the **highest-priority future release gates** (see the near-future section above). Additional improvements planned for future production versions:
 
