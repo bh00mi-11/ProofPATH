@@ -20,8 +20,21 @@ function normalizeEvidenceType(typeStr?: string): Evidence['type'] {
 }
 
 function resolveDefaultApiBase(): string {
+  // If explicitly configured in environment, use it
   if (process.env.EXPO_PUBLIC_API_BASE_URL) {
-    return process.env.EXPO_PUBLIC_API_BASE_URL.replace(/\/+$/, '');
+    const configured = process.env.EXPO_PUBLIC_API_BASE_URL.replace(/\/+$/, '');
+    // If in a browser on a phone/LAN IP, don't let a localhost env var break the connection
+    if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+      const host = window.location.hostname;
+      if (host !== 'localhost' && host !== '127.0.0.1' && configured.includes('localhost')) {
+        return `http://${host}:8000`;
+      }
+    }
+    return configured;
+  }
+  // When running in a browser (web), route to same host on port 8000 automatically
+  if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+    return `http://${window.location.hostname}:8000`;
   }
   // Android emulator routes host localhost to 10.0.2.2
   if (Platform.OS === 'android') {
