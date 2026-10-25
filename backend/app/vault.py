@@ -81,7 +81,13 @@ class EvidenceVault:
 
         sha = compute_sha256_bytes(content)
         import uuid
-        artifact_id = f"art_{uuid.uuid4().hex[:12]}"
+        # Synthetic demo runs on independent ephemeral instances; use stable IDs
+        # so navigation and evidence links agree across cold starts.
+        artifact_id = (
+            "art_" + hashlib.sha256((safe_original_name + ":" + sha).encode("utf-8")).hexdigest()[:12]
+            if os.getenv("PROOFPATH_ENV") == "synthetic_demo"
+            else f"art_{uuid.uuid4().hex[:12]}"
+        )
         safe_name = f"{artifact_id}{ext}"
         target_path = self.vault_dir / safe_name
         
