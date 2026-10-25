@@ -43,6 +43,7 @@ export default function EvidenceScreen() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
 
@@ -405,10 +406,13 @@ export default function EvidenceScreen() {
             </View>
             <ThemedText type="title">{t.evidence.title}</ThemedText>
             <ThemedText type="default" style={styles.subtitle}>
-              Chronological log of uploaded digital artifacts, SHA-256 integrity digests, and linked factual observations for case record <ThemedText type="smallBold">"{currentCase?.title || caseId}"</ThemedText>.
+              Your saved screenshots, messages and files. Tap an item only when you want to see more.
             </ThemedText>
           </View>
 
+          {/* Technical explanations are optional, not the first thing a person in distress sees. */}
+          {showFilters && (
+          <>
           {/* Transparent Integrity Notice */}
           <ThemedView type="backgroundElement" style={styles.noticeBanner}>
             <ThemedText type="smallBold" style={styles.noticeBannerTitle}>
@@ -419,14 +423,16 @@ export default function EvidenceScreen() {
             </ThemedText>
           </ThemedView>
 
+          </>
+          )}
           {/* Quick Action Banner to Add Evidence */}
           <ThemedView type="backgroundElement" style={styles.uploadCtaCard}>
             <View style={styles.uploadCtaInfo}>
               <ThemedText type="subtitle" style={styles.uploadCtaTitle}>
-                Add Incident Evidence
+                Save something that happened
               </ThemedText>
               <ThemedText type="small" style={styles.uploadCtaSub}>
-                Upload photos, documents, or create a tamper-evident text statement with instant cryptographic hashing.
+                Add a screenshot, message or file. You can explain it later.
               </ThemedText>
             </View>
             <Pressable
@@ -441,6 +447,13 @@ export default function EvidenceScreen() {
             </Pressable>
           </ThemedView>
 
+          <Pressable accessibilityRole="button" onPress={() => setShowFilters((value) => !value)} style={{ paddingVertical: 12 }}>
+            <ThemedText type="smallBold" style={styles.sectionHeader}>
+              {showFilters ? 'Hide search and technical options ▲' : 'Search or filter saved items ▼'}
+            </ThemedText>
+          </Pressable>
+          {showFilters && (
+          <>
           {/* Search, Filter, and Sorting Rail */}
           <ThemedView type="backgroundElement" style={styles.filterCard}>
             <View style={styles.searchRow}>
@@ -510,10 +523,12 @@ export default function EvidenceScreen() {
             </View>
           </ThemedView>
 
+          </>
+          )}
           {/* Chronological Evidence Cards */}
           <View style={styles.sectionHeaderRow}>
             <ThemedText type="smallBold" style={styles.sectionHeader}>
-              EVIDENCE ARTIFACTS ({sortedEvidence.length} of {evidence.length})
+              YOUR SAVED ITEMS ({sortedEvidence.length})
             </ThemedText>
             <View style={styles.sectionActionButtons}>
               <Pressable
@@ -582,17 +597,17 @@ export default function EvidenceScreen() {
               NEXT WORKFLOW STEP
             </ThemedText>
             <ThemedText type="subtitle" style={styles.nextActionTitle}>
-              Simulate Claim Consistency in Time Machine
+              See how your records fit together
             </ThemedText>
             <ThemedText type="small" style={styles.nextActionDesc}>
-              Discover how conclusions hold up if a key piece of evidence is missing or contested.
+              Review what your saved records support, what does not match, and what is still unclear.
             </ThemedText>
             <Pressable
               style={styles.nextActionButton}
               onPress={() => router.push('/time-machine')}
             >
               <ThemedText type="smallBold" style={styles.nextActionButtonText}>
-                Open Time Machine & Analysis →
+                Review what the evidence shows →
               </ThemedText>
             </Pressable>
           </ThemedView>
