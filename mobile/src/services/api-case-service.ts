@@ -196,7 +196,7 @@ export const apiCaseService: ICaseService & {
   proposeObservations: (artifactId: string, caseId?: string) => Promise<{ status: string; artifact_id: string; filename: string; proposed: import('@/types/proofpath.types').ObservationProposal[]; message?: string }>;
   linkClaimObservation: (caseId: string, claimId: string, observationId: string, relation?: 'SUPPORTS' | 'CONTRADICTS' | 'CONTEXT') => Promise<{ status: string; link: { id: string; claim_id: string; observation_id: string; relation: string } }>;
   unlinkClaimObservation: (caseId: string, claimId: string, observationId: string) => Promise<{ status: string }>;
-  exportPdf: (caseId: string, recipient: RecipientType, confirmedConfig: boolean, redactedTerms?: string[], includeAccountability?: boolean) => Promise<Blob>;
+  exportPdf: (caseId: string, recipient: RecipientType, confirmedConfig: boolean, redactedTerms?: string[], includeAccountability?: boolean) => Promise<Blob | { uri: string; size: number }>;
 } = {
   async runStressTest(caseId: string = 'case_demo_01') {
     return request<import('@/types/proofpath.types').StressTestResult>(`/api/cases/${encodeURIComponent(caseId)}/stress-test`);
