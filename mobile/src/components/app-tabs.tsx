@@ -66,7 +66,7 @@ export default function AppTabs() {
     <Tabs tabBar={(props) => <VisibleTabBar {...props} />}
       screenOptions={{ headerShown: false, tabBarShowLabel: true }}>
       {secondaryRoutes.map((name) => (
-        <Tabs.Screen key={name} name={name} options={{ href: null }} />
+        <Tabs.Screen key={name} name={name} options={{ title: name }} />
       ))}
       {items.map((item) => (
         <Tabs.Screen key={item.name} name={item.name} options={{ title: item.title }} />
