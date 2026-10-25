@@ -121,7 +121,7 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={DefaultTheme}>
       <LanguageProvider>
-        <CaseProvider>
+        <CaseProvider key={user}>
           <AppTabs />
         </CaseProvider>
       </LanguageProvider>
