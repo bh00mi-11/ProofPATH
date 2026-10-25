@@ -7,6 +7,7 @@ import {
   TextInput,
   Text,
   Linking,
+  Alert,
   Platform,
   useWindowDimensions,
 } from 'react-native';
@@ -176,11 +177,11 @@ export default function GuardianScreen() {
       const res = await fetch(`${API_BASE_URL}/api/guardian/sessions/${activeSession.id}/sos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latitude: 12.9716, longitude: 77.5946 }),
+        body: JSON.stringify({}),
       });
       if (res.ok) {
         const data = await res.json();
-        setStatusMessage(`SOS logged: ${data.alerts?.length || 0} alerts recorded as ATTEMPTED.`);
+        setStatusMessage(`SOS recorded: ${data.alerts?.length || 0} attempts. No delivery is confirmed. For emergencies, call 112 directly.`);
         await fetchContactsAndSession();
       }
     } catch {
@@ -188,6 +189,13 @@ export default function GuardianScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const confirmSOS = () => {
+    Alert.alert('Record an SOS attempt?', 'This logs an alert attempt only. It does not confirm SMS delivery, dispatch police, or share live location.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Record attempt', onPress: handleTriggerSOS },
+    ]);
   };
 
   const handleCall112 = () => {
@@ -286,7 +294,7 @@ export default function GuardianScreen() {
 
                 <View style={styles.sessionActionRow}>
                   <Pressable
-                    onPress={handleTriggerSOS}
+                    onPress={confirmSOS}
                     disabled={loading}
                     style={styles.sosButton}
                   >
@@ -355,7 +363,7 @@ export default function GuardianScreen() {
                   Trusted Emergency Contacts ({contacts.length})
                 </ThemedText>
                 <ThemedText type="small" style={styles.dimText}>
-                  Configured recipients for safety check-ins and emergency SOS dispatches.
+                  Saved contacts for safety check-ins. Automatic SMS delivery is not available.
                 </ThemedText>
               </View>
               <Pressable
@@ -377,7 +385,7 @@ export default function GuardianScreen() {
                     No emergency contacts added yet
                   </ThemedText>
                   <ThemedText type="small" style={styles.emptyContactsDesc}>
-                    Add family members, trusted colleagues, or legal advocates so you can instantly alert them during a crisis.
+                    Add family members, trusted colleagues, or legal advocates to keep their contact details available. ProofPath does not automatically send them alerts.
                   </ThemedText>
                 </View>
               ) : (
