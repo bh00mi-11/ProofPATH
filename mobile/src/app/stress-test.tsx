@@ -20,7 +20,7 @@ import { useTranslation } from '@/context/LanguageContext';
 
 export default function StressTestScreen() {
   const { t } = useTranslation();
-  const { currentCase } = useCaseState();
+  const { currentCase, selectCase } = useCaseState();
   const caseId = currentCase?.id;
   const [data, setData] = useState<StressTestResult | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -29,16 +29,23 @@ export default function StressTestScreen() {
   const isDesktop = width >= 1024;
 
   const fetchStressTest = useCallback(async () => {
-    if (!caseId) {
-      setData(null);
-      setError(null);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
-      const res = await apiCaseService.runStressTest(caseId);
+      // A stale case can survive navigation or a previous login. The server's
+      // authenticated case list is authoritative, not cached screen state.
+      const cases = await apiCaseService.getCases();
+      if (!cases.length) {
+        setData(null);
+        setError('No case is available for this account. Create a case first.');
+        return;
+      }
+      const validCaseId = caseId && cases.some(c => c.id === caseId)
+        ? caseId : cases[0].id;
+      if (validCaseId !== caseId) {
+        await selectCase(validCaseId);
+      }
+      const res = await apiCaseService.runStressTest(validCaseId);
       setData(res);
     } catch (err: any) {
       setError(err?.message || 'Could not connect to FastAPI backend at http://localhost:8000');
@@ -46,7 +53,7 @@ export default function StressTestScreen() {
     } finally {
       setLoading(false);
     }
-  }, [caseId]);
+  }, [caseId, selectCase]);
 
   useEffect(() => {
     fetchStressTest();
