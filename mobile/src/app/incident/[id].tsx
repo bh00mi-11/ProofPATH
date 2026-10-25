@@ -116,7 +116,7 @@ export default function IncidentDetailsScreen() {
             </Pressable>
             <Pressable
               style={styles.actionBtnSecondary}
-              onPress={() => router.push('/incident/create')}
+              onPress={() => router.push('/incident/create' as any)}
             >
               <ThemedText style={styles.actionBtnSecondaryText}>+ New Record</ThemedText>
             </Pressable>

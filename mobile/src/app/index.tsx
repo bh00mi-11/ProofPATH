@@ -129,7 +129,7 @@ export default function HomeScreen() {
                     hovered && styles.primaryCtaHovered,
                     pressed && styles.pressed,
                   ]}
-                  onPress={() => router.push('/incident/create')}
+                  onPress={() => router.push('/incident/create' as any)}
                   accessibilityRole="button"
                   accessibilityLabel="Create New Incident Record"
                 >
@@ -145,7 +145,7 @@ export default function HomeScreen() {
                   hovered && styles.secondaryCtaHovered,
                   pressed && styles.pressed,
                 ]}
-                onPress={() => router.push('/incident/create')}
+                onPress={() => router.push('/incident/create' as any)}
                 accessibilityRole="button"
                 accessibilityLabel="Create another case"
               >

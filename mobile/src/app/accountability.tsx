@@ -72,7 +72,7 @@ import { useTranslation } from '@/context/LanguageContext';
 export default function AccountabilityTrailScreen() {
   const { t } = useTranslation();
   const { currentCase, evidence } = useCaseState();
-  const caseId = currentCase?.id;
+  const caseId = currentCase?.id || 'case_demo_01';
 
   const [data, setData] = useState<AccountabilityTimeline | null>(null);
   const [loading, setLoading] = useState<boolean>(true);

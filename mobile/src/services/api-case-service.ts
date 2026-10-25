@@ -25,9 +25,13 @@ function resolveDefaultApiBase(): string {
   // If explicitly configured in environment, use it
   if (process.env.EXPO_PUBLIC_API_BASE_URL) {
     const configured = process.env.EXPO_PUBLIC_API_BASE_URL.replace(/\/+$/, '');
-    // If in a browser on a phone/LAN IP, don't let a localhost env var break the connection
     if (typeof window !== 'undefined' && window.location && window.location.hostname) {
       const host = window.location.hostname;
+      // If browser is on laptop localhost/127.0.0.1, connect to local backend on port 8000
+      if ((host === 'localhost' || host === '127.0.0.1') && !configured.includes('localhost') && !configured.includes('127.0.0.1')) {
+        return `http://${host}:8000`;
+      }
+      // If in a browser on a phone/LAN IP, don't let a localhost env var break the connection
       if (host !== 'localhost' && host !== '127.0.0.1' && configured.includes('localhost')) {
         return `http://${host}:8000`;
       }

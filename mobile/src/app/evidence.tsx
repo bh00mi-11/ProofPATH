@@ -561,7 +561,7 @@ export default function EvidenceScreen() {
               </Pressable>}
               <Pressable
                 style={styles.addRecordBtn}
-                onPress={() => router.push(`/incident/${caseId}`)}
+                onPress={() => router.push(`/incident/${caseId}` as any)}
               >
                 <ThemedText style={styles.addRecordBtnText}>View Incident →</ThemedText>
               </Pressable>
