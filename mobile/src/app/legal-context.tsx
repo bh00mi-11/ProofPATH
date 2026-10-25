@@ -24,7 +24,7 @@ import { safeBack } from '@/utils/navigation';
 export default function LegalContextScreen() {
   const { t } = useTranslation();
   const { currentCase } = useCaseState();
-  const caseId = currentCase?.id || 'case_demo_01';
+  const caseId = currentCase?.id;
 
   const [data, setData] = useState<LegalContextResult | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -34,6 +34,7 @@ export default function LegalContextScreen() {
     setLoading(true);
     setError(null);
     try {
+      if (!caseId) { setError('Create or select a case first.'); return; }
       const res = await apiCaseService.getLegalContext(caseId);
       setData(res);
     } catch (err: any) {
