@@ -96,9 +96,9 @@ export function EvidenceTimelineCard({
           {evidence.name}
         </ThemedText>
 
-        <ThemedText type="small" style={styles.dimText}>
+        {!isExpanded && <ThemedText type="small" numberOfLines={2} style={styles.dimText}>
           {observations.length > 0 ? observations[0].text : 'Saved. Add a note about what this file shows when you are ready.'}
-        </ThemedText>
+        </ThemedText>}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={isExpanded ? 'Hide evidence details' : 'Show evidence details'}
