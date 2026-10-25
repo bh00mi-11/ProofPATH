@@ -15,6 +15,43 @@ Rather than storing unorganized screenshots in camera rolls or relying on error-
 
 ---
 
+## Hosted MVP deployment: Vercel website + Render free API
+
+**Website:** https://proofpath-jet.vercel.app (production alias; new branch changes only reach this URL after merge). **Backend:** https://proofpath-v2l4.onrender.com. **Health:** https://proofpath-v2l4.onrender.com/api/health.
+
+```text
+Browser -> Vercel (Expo Web frontend)
+                |
+                +-- /api/* rewrite -> Render Free (FastAPI)
+                                       |-- SQLite (ephemeral)
+                                       +-- uploaded files (ephemeral)
+Android app -------------------------> Render Free (FastAPI)
+```
+
+The browser uses **one Vercel origin**, but FastAPI **runs on Render**, not Vercel. The rewrite in `mobile/vercel.json` forwards API calls to Render. No paid Render Blueprint or credit card is required. For Vercel, set root directory `mobile`, build command `npx expo export --platform web`, and output directory `dist`. Do not override `EXPO_PUBLIC_API_BASE_URL` with an unrelated URL if using the same-origin proxy.
+
+**Existing Render Web Service:** root directory `backend`; build command `pip install -r requirements.txt`; start command `uvicorn app.main:app --host 0.0.0.0 --port $PORT`; health check `/api/health`. Root `render.yaml` is an *optional* free Blueprint with no persistent disk. You do not need to recreate the already-running service.
+
+**Safety:** This public deployment is for fictional cases and synthetic files **only**. Render Free storage is ephemeral: uploaded files and SQLite records may be lost on restart or redeploy. The backend lacks per-user authentication and private evidence access controls. Do not upload real screenshots, identities or incident details. SOS opens the phone dialer and does not automatically alert emergency services.
+
+**Android:** `mobile/eas.json` contains a preview APK profile. Native builds must use `EXPO_PUBLIC_API_BASE_URL=https://proofpath-v2l4.onrender.com` at build time. Native PDF saving/sharing is not implemented and must not be claimed as working.
+
+**Release gate:** Verify health, create a fictional case, upload several synthetic evidence files, inspect the timeline, download a web PDF, and open Remedies. Run backend tests, TypeScript checks and Expo web export before merging the deployment branch. A READY Vercel build alone is not an end-to-end test.
+
+---
+
+## Authentication and accountability release requirements (not yet implemented)
+
+**Status: BLOCKED for real personal data.** The hosted demo currently has no authentication or backend case-ownership checks. Login screens alone are insufficient; do not advertise this as a secure multi-user service.
+
+Required roles: **case owner** (can create, read, update, export and attach evidence only for their own cases) and **platform admin** (can manage demo accounts and operational health but cannot automatically read private evidence). Passwords must be securely hashed; sessions must be verified server-side; every case, artifact, observation, claim, PDF export, scenario, remedy, accountability and guardian endpoint must enforce authorization. Existing demo records need an explicit migration/ownership strategy, not automatic assignment to arbitrary users. Avoid storing auth tokens in insecure browser storage.
+
+**Accountability Trail:** The existing backend already implements user-created entries, append-only status-transition entries, evidence references and follow-up completion. A user can report their own actions and status; `DOCUMENT_SUPPORTED` means a document was attached, **not that an authority verified the status**. New work should add explicit actor identity, an immutable audit event for every change, user-facing action/status/evidence/follow-up controls, and clear `USER_REPORTED` versus independently verified labels. Admin must not impersonate an authority.
+
+**Release gate:** Test unauthenticated access (401), user A trying user B's case and evidence (403/404), cross-case attachment rejection, PDF authorization, expired sessions, and admin's inability to read evidence by default. Then run all backend and frontend tests and an end-to-end synthetic-data smoke test before merging to `main`.
+
+---
+
 ## Table of Contents
 
 - [Problem Statement](#problem-statement)

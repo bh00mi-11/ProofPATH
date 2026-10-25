@@ -46,7 +46,7 @@ export default function EvidenceScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
-  const isHostedDemo = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app');
+  // Public deployments accept synthetic test evidence; never use real personal records.
 
   // Add Evidence modal state
   const [modalVisible, setModalVisible] = useState(false);
@@ -110,36 +110,34 @@ export default function EvidenceScreen() {
       const res = await DocumentPicker.getDocumentAsync({
         type: ['text/plain', 'text/csv', 'application/pdf', 'image/*'],
         copyToCacheDirectory: true,
+        multiple: true,
       });
 
       if (res.canceled || !res.assets || res.assets.length === 0) {
         return;
       }
 
-      const asset = res.assets[0];
       setIsUploading(true);
-
-      const fileObj = {
-        uri: asset.uri,
-        name: asset.name,
-        type: asset.mimeType || 'application/octet-stream',
-        file: (asset as any).file,
-      };
-
-      const uploaded = await uploadEvidenceToCase(caseId, fileObj);
-      setUploadSuccess(`Successfully saved ${uploaded.name}!`);
-      setTimeout(() => {
-        setUploadSuccess(null);
-        setModalVisible(false);
-        // Immediately show "Review details from this evidence" within the same flow
-        const ext = uploaded.name.split('.').pop()?.toLowerCase();
-        if (ext === 'txt' || ext === 'csv') {
-          handleOpenReviewFacts(uploaded);
-        } else {
-          // If extraction is unsupported (e.g. PDF/image/unsupported), open manual entry with clear explanation
-          handleOpenAddObservation(uploaded);
+      let saved = 0;
+      const failures: string[] = [];
+      for (const asset of res.assets) {
+        try {
+          await uploadEvidenceToCase(caseId, {
+            uri: asset.uri,
+            name: asset.name,
+            type: asset.mimeType || 'application/octet-stream',
+            file: (asset as any).file,
+          });
+          saved++;
+        } catch (error: any) {
+          failures.push(`${asset.name}: ${error?.message || 'Upload failed'}`);
         }
-      }, 700);
+      }
+      if (saved) {
+        await refreshData();
+        setUploadSuccess(`Saved ${saved} evidence file${saved === 1 ? '' : 's'}. You can add more at any time.`);
+      }
+      if (failures.length) setUploadError(failures.join('\n'));
     } catch (err: any) {
       const msg = typeof err === 'string' ? err : err?.message || (err?.detail ? JSON.stringify(err.detail) : 'Failed to pick or upload document');
       setUploadError(msg);
@@ -161,31 +159,35 @@ export default function EvidenceScreen() {
         mediaTypes: ['images'],
         allowsEditing: false,
         quality: 0.9,
+        allowsMultipleSelection: true,
       });
 
       if (res.canceled || !res.assets || res.assets.length === 0) {
         return;
       }
 
-      const asset = res.assets[0];
       setIsUploading(true);
-
-      const filename = asset.fileName || `evidence_photo_${Date.now()}.jpg`;
-      const fileObj = {
-        uri: asset.uri,
-        name: filename,
-        type: asset.mimeType || 'image/jpeg',
-        file: (asset as any).file,
-      };
-
-      const uploaded = await uploadEvidenceToCase(caseId, fileObj);
-      setUploadSuccess(`Successfully saved ${uploaded.name}!`);
-      setTimeout(() => {
-        setUploadSuccess(null);
-        setModalVisible(false);
-        // Automatic text extraction does not run on image binaries; immediately offer manual detail review
-        handleOpenAddObservation(uploaded);
-      }, 700);
+      let saved = 0;
+      const failures: string[] = [];
+      for (const asset of res.assets) {
+        const filename = asset.fileName || `evidence_photo_${Date.now()}_${saved}.jpg`;
+        try {
+          await uploadEvidenceToCase(caseId, {
+            uri: asset.uri,
+            name: filename,
+            type: asset.mimeType || 'image/jpeg',
+            file: (asset as any).file,
+          });
+          saved++;
+        } catch (error: any) {
+          failures.push(`${filename}: ${error?.message || 'Upload failed'}`);
+        }
+      }
+      if (saved) {
+        await refreshData();
+        setUploadSuccess(`Saved ${saved} image${saved === 1 ? '' : 's'}. You can add more at any time.`);
+      }
+      if (failures.length) setUploadError(failures.join('\n'));
     } catch (err: any) {
       const msg = typeof err === 'string' ? err : err?.message || (err?.detail ? JSON.stringify(err.detail) : 'Failed to select or upload image');
       setUploadError(msg);
@@ -416,11 +418,11 @@ export default function EvidenceScreen() {
             </ThemedText>
           </View>
 
-          {isHostedDemo && (
+          {Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app') && (
             <ThemedView type="backgroundElement" style={styles.noticeBanner}>
               <ThemedText type="smallBold" style={styles.noticeBannerTitle}>FICTIONAL DEMO RECORDS ONLY</ThemedText>
               <ThemedText type="small" style={styles.noticeBannerText}>
-                For testing, you can read and analyze example records. Real screenshots, messages and personal details cannot be saved here. Use the local secure backend for development, not this public demo.
+                Use fictional records and synthetic files only. This public demo has no secure personal-data storage; uploaded test data may be lost when the free backend restarts.
               </ThemedText>
             </ThemedView>
           )}
@@ -440,7 +442,7 @@ export default function EvidenceScreen() {
           </>
           )}
           {/* Quick Action Banner to Add Evidence */}
-          {!isHostedDemo && (
+          {(
           <ThemedView type="backgroundElement" style={styles.uploadCtaCard}>
             <View style={styles.uploadCtaInfo}>
               <ThemedText type="subtitle" style={styles.uploadCtaTitle}>
@@ -547,7 +549,7 @@ export default function EvidenceScreen() {
               YOUR SAVED ITEMS ({sortedEvidence.length})
             </ThemedText>
             <View style={styles.sectionActionButtons}>
-              {!isHostedDemo && <Pressable
+              {<Pressable
                 style={styles.addEvidenceSmallBtn}
                 onPress={() => {
                   setUploadError(null);

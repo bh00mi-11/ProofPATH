@@ -2,7 +2,7 @@
 FastAPI Server for ProofPath: The Evidence Time Machine Backend.
 Coordinates Evidence Vault, Deterministic Trace Engine, Stress Test, and PDF Compiler.
 """
-from fastapi import FastAPI, UploadFile, File, HTTPException, Response, Query
+from fastapi import FastAPI, UploadFile, File, HTTPException, Response, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
@@ -10,6 +10,8 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 import os
 import sqlite3
+from fastapi.responses import JSONResponse
+from . import auth
 
 from .db import init_db, get_connection, VAULT_DIR, DB_PATH
 from .vault import EvidenceVault
@@ -166,6 +168,66 @@ def get_validated_case(conn: sqlite3.Connection, case_id: str) -> Dict[str, Any]
         raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found")
     return dict(row)
 
+class Credentials(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/auth/register")
+def register_user(req: Credentials):
+    return auth.register(req.email, req.password)
+
+@app.post("/api/auth/login")
+def login_user(req: Credentials):
+    return auth.login(req.email, req.password)
+
+@app.get("/api/auth/me")
+def who_am_i(request: Request):
+    return request.state.user
+
+@app.post("/api/auth/logout")
+def logout_user(request: Request):
+    auth.logout(request.state.token)
+    return {"status": "ok"}
+
+@app.middleware("http")
+async def enforce_case_ownership(request: Request, call_next):
+    path = request.url.path
+    if request.method == "OPTIONS" or path in {"/api/health", "/api/auth/register", "/api/auth/login"} or not path.startswith("/api/"):
+        return await call_next(request)
+    authorization = request.headers.get("authorization", "")
+    token = authorization[7:] if authorization.lower().startswith("bearer ") else ""
+    user = auth.authenticate(token) if token else None
+    if not user:
+        return JSONResponse({"detail": "Login required"}, status_code=401)
+    request.state.user = user
+    request.state.token = token
+    if path.startswith("/api/guardian/"):
+        return JSONResponse({"detail": "Guardian contacts and sessions are disabled pending per-user isolation"}, status_code=403)
+    if path == "/api/seed":
+        return JSONResponse({"detail": "Seed endpoint disabled for authenticated deployments"}, status_code=403)
+    if path == "/api/cases" and request.method == "GET":
+        response = await call_next(request)
+        return response
+    case_id = request.query_params.get("case_id")
+    segments = path.split("/")
+    if len(segments) > 3 and segments[2] == "cases":
+        case_id = segments[3]
+    if path.startswith("/api/artifacts/") and path != "/api/artifacts/upload":
+        artifact_id = segments[3] if len(segments) > 3 else ""
+        with get_connection() as conn:
+            row = conn.execute("SELECT case_id FROM artifacts WHERE id=?", (artifact_id,)).fetchone()
+        if not row:
+            return JSONResponse({"detail": "Not found"}, status_code=404)
+        case_id = row["case_id"]
+    if path.startswith("/api/claim-links") and not case_id:
+        return JSONResponse({"detail": "Case identifier required"}, status_code=403)
+    if path.startswith("/api/") and request.method in {"POST", "PUT", "DELETE"} and path not in {"/api/cases", "/api/auth/logout"} and not case_id:
+        # Fail closed until every body-based endpoint is explicitly scoped.
+        return JSONResponse({"detail": "Endpoint requires ownership enforcement before use"}, status_code=403)
+    if case_id and not auth.owns_case(user["id"], case_id):
+        return JSONResponse({"detail": "Case not found"}, status_code=404)
+    return await call_next(request)
+
 @app.get("/api/health")
 def health_check():
     return {"status": "ok", "service": "ProofPath Backend"}
@@ -182,18 +244,18 @@ def reset_and_seed():
         conn.close()
 
 @app.get("/api/cases")
-def list_cases():
+def list_cases(request: Request):
     conn = get_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM cases ORDER BY created_at DESC")
+        cur.execute("SELECT c.* FROM cases c JOIN case_owners o ON o.case_id=c.id WHERE o.user_id=? ORDER BY c.created_at DESC", (request.state.user["id"],))
         cases = [dict(r) for r in cur.fetchall()]
         return {"cases": cases}
     finally:
         conn.close()
 
 @app.post("/api/cases")
-def create_case(req: CaseCreateRequest):
+def create_case(req: CaseCreateRequest, request: Request):
     if not req.title.strip():
         raise HTTPException(status_code=400, detail="Title cannot be empty")
     import uuid
@@ -220,6 +282,8 @@ def create_case(req: CaseCreateRequest):
                         "Initial Claim"
                     )
                 )
+        with get_connection() as owner_conn:
+            owner_conn.execute("INSERT INTO case_owners(case_id,user_id) VALUES(?,?)", (case_id, request.state.user["id"]))
         return {"status": "success", "case": {"id": case_id, "title": req.title.strip(), "description": (req.description or "").strip()}}
     finally:
         conn.close()
