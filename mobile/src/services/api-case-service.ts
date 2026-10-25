@@ -618,6 +618,7 @@ export const apiCaseService: ICaseService & {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/pdf',
+          ...(activeAuthToken ? { Authorization: `Bearer ${activeAuthToken}` } : {}),
         },
         body: JSON.stringify({
           case_id: caseId,
