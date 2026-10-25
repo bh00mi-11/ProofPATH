@@ -17,6 +17,7 @@ export const Colors = {
     background: '#F8FAFC', // Slate 50
     backgroundElement: '#FFFFFF',
     backgroundSubtle: '#F1F5F9', // Slate 100
+    backgroundSecondary: '#F1F5F9',
     backgroundSelected: '#EEF2FF', // Indigo 50
     border: '#E2E8F0', // Slate 200
     borderSubtle: '#F1F5F9',
