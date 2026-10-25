@@ -47,7 +47,7 @@ init_db(DB_PATH)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: ensure demo fixture is available in development mode
-    if ENV_MODE == "development":
+    if ENV_MODE in {"development", "synthetic_demo"}:
         conn = get_connection()
         try:
             cur = conn.cursor()
