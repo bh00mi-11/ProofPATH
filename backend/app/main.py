@@ -201,6 +201,10 @@ async def enforce_case_ownership(request: Request, call_next):
         return JSONResponse({"detail": "Login required"}, status_code=401)
     request.state.user = user
     request.state.token = token
+    if path.startswith("/api/admin/"):
+        if user["role"] != "admin":
+            return JSONResponse({"detail":"Admin role required"}, status_code=403)
+        return await call_next(request)
     if path.startswith("/api/guardian/"):
         return JSONResponse({"detail": "Guardian contacts and sessions are disabled pending per-user isolation"}, status_code=403)
     if path == "/api/seed":
@@ -227,6 +231,62 @@ async def enforce_case_ownership(request: Request, call_next):
     if case_id and not auth.owns_case(user["id"], case_id):
         return JSONResponse({"detail": "Case not found"}, status_code=404)
     return await call_next(request)
+
+class AccountabilityVerificationRequest(BaseModel):
+    decision: str
+    rationale: str
+
+@app.get("/api/admin/accountability/pending")
+def admin_pending_accountability(request: Request):
+    if request.state.user["role"] != "admin":
+        raise HTTPException(403, "Admin role required")
+    with get_connection() as conn:
+        rows = conn.execute("""
+            SELECT e.id,e.case_id,e.action_type,e.description,e.organization,
+                   e.reference_number,e.artifact_id,e.user_event_time,e.created_at
+            FROM accountability_entries e
+            WHERE NOT EXISTS (
+                SELECT 1 FROM accountability_verifications v WHERE v.entry_id=e.id
+            )
+            ORDER BY e.created_at DESC LIMIT 100
+        """).fetchall()
+        return {"entries": [dict(row) for row in rows], "note": "User-reported, not independently verified"}
+
+@app.post("/api/admin/accountability/{entry_id}/verify")
+def admin_verify_accountability(entry_id: str, req: AccountabilityVerificationRequest, request: Request):
+    if request.state.user["role"] != "admin":
+        raise HTTPException(403, "Admin role required")
+    if req.decision not in {"VERIFIED", "REJECTED"} or len(req.rationale.strip()) < 10:
+        raise HTTPException(400, "VERIFIED/REJECTED and a rationale of at least 10 characters required")
+    import uuid
+    with get_connection() as conn:
+        entry = conn.execute("SELECT id,case_id FROM accountability_entries WHERE id=?", (entry_id,)).fetchone()
+        if not entry:
+            raise HTTPException(404, "Accountability entry not found")
+        # Append-only decisions: no mutation of the original user-reported record.
+        decision_id = "ver_" + uuid.uuid4().hex
+        with conn:
+            conn.execute("""INSERT INTO accountability_verifications
+                         (id,entry_id,case_id,reviewer_id,decision,rationale)
+                         VALUES (?,?,?,?,?,?)""",
+                         (decision_id,entry_id,entry["case_id"],request.state.user["id"],
+                          req.decision,req.rationale.strip()))
+            conn.execute("INSERT INTO auth_audit(actor_id,case_id,action) VALUES(?,?,?)",
+                         (request.state.user["id"],entry["case_id"],
+                          "accountability_" + req.decision.lower()))
+    return {"id":decision_id,"entry_id":entry_id,"decision":req.decision,
+            "classification":"ADMIN_REVIEWED",
+            "disclaimer":"Admin review is not independent confirmation by police or other external authorities"}
+
+@app.get("/api/admin/accountability/{entry_id}/history")
+def admin_verification_history(entry_id: str, request: Request):
+    if request.state.user["role"] != "admin":
+        raise HTTPException(403, "Admin role required")
+    with get_connection() as conn:
+        rows = conn.execute("""SELECT id,entry_id,decision,rationale,reviewer_id,created_at
+                               FROM accountability_verifications WHERE entry_id=?
+                               ORDER BY created_at,id""",(entry_id,)).fetchall()
+        return {"decisions":[dict(row) for row in rows]}
 
 @app.get("/api/health")
 def health_check():
