@@ -116,6 +116,23 @@ npm run web
 
 Open the local Expo URL printed in the terminal. For a phone on the same Wi-Fi network, configure `EXPO_PUBLIC_API_BASE_URL` to your computer's reachable LAN address (for example `http://192.168.1.10:8000`), start FastAPI with `--host 0.0.0.0`, and run Expo locally. The sample IP must be replaced with your actual LAN IP.
 
+## Local authentication and admin demo
+
+1. Register a user in the Expo app with an email and password of at least 12 characters, then sign in.
+2. To create a local admin, register a second account and run from `backend/`:
+
+   ```bash
+   # macOS / Linux
+   PROOFPATH_ADMIN_PROVISION=1 python -m app.provision_admin admin@example.com
+   # Windows PowerShell
+   $env:PROOFPATH_ADMIN_PROVISION='1'; python -m app.provision_admin admin@example.com
+   ```
+
+3. Sign in with the admin account to view pending user-reported accountability entries, record a reason and choose Verify or Reject. This means **internal admin review only**, not confirmation by police or a platform.
+4. For Expo Go on a physical phone, run the backend on `0.0.0.0:8000`, set `EXPO_PUBLIC_API_BASE_URL` to `http://YOUR_LAPTOP_LAN_IP:8000` in `mobile/.env`, and run `npx expo start --clear --lan`. Phone and laptop must be on the same Wi-Fi.
+
+**Warning:** This integration is experimental and not yet confirmed by a full backend and Expo Go test pass. Use synthetic evidence only.
+
 ## Testing
 
 ```bash
@@ -127,7 +144,7 @@ The project previously recorded 69 passing backend tests; **this README revision
 
 ## Security and limitations
 
-- **The current `main` MVP does not include working login, registration, admin accounts or backend-enforced per-user case ownership.** Do not enter real identifying details or genuine abuse evidence.
+- **The local authentication prototype includes registration, login, server-side sessions, owner-scoped cases and an admin accountability review screen. These are **experimental** and have not passed a full security audit; do not enter real incident data.** Do not enter real identifying details or genuine abuse evidence.
 - SHA-256 is a file-integrity check, not proof of authenticity, authorship or legal admissibility.
 - An Accountability Trail entry, attached document or `DOCUMENT_SUPPORTED` state **does not mean a police officer, platform or institution verified the action**.
 - Text extraction has format limitations; screenshot OCR is not guaranteed. Native PDF saving/sharing is incomplete.
@@ -136,12 +153,12 @@ The project previously recorded 69 passing backend tests; **this README revision
 
 ## Roadmap
 
-**Next engineering phase, separate from the stable MVP:**
+**Experimental in local MVP, requiring verification and hardening:**
 
-- [ ] Secure user registration/login/logout, session expiry and password reset
-- [ ] Backend case ownership and authorization on every evidence, claim, download, export and accountability route
-- [ ] Role-based admin interface with explicit assignment, least privilege and audit logs
-- [ ] **Verified Accountability:** preserve user-reported entries; allow an authorized reviewer to verify or reject a particular entry with attributable evidence and an append-only decision history
+- [x] Prototype registration, login, logout endpoint and expiring server-side sessions; password reset and full session security are pending
+- [ ] Complete and test backend authorization on **every** case, evidence, claim, export and accountability route (partial enforcement exists)
+- [x] Prototype role-based admin review screen and local-only admin provisioning; complete least-privilege and audit testing pending
+- [x] Prototype admin review decisions (verified/rejected) with reviewer attribution and append-only history; this is internal review, **not external institutional verification**
 - [ ] Automated cross-user isolation, authentication, role and privacy tests
 - [ ] Encrypted durable storage, backup/retention controls and improved native mobile export
 
