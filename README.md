@@ -15,6 +15,44 @@ Rather than storing unorganized screenshots in camera rolls or relying on error-
 
 ---
 
+## Hosted MVP deployment (web + Android)
+
+**Current architecture:** One Expo/React Native codebase targets web and Android; both call the FastAPI service. FastAPI currently stores cases in **SQLite** and uploaded evidence in a **local vault directory**. A persistent disk is mandatory for any backend deployment expected to retain records. The hosted MVP is for **fictional/synthetic demonstrations only** until authentication, per-user authorization, private storage, retention/deletion policy, and an independent security review are completed.
+
+```text
+Expo Web -> Vercel ----HTTPS----+
+                               +--> FastAPI on Render --> persistent disk (/var/data)
+Android APK (EAS) --HTTPS-------+                       |- proofpath.db (SQLite)
+                                                       +- vault/ (uploaded files)
+```
+
+### Backend on Render
+
+1. In Render, create a **Blueprint** from this GitHub repository using the root `render.yaml`. It provisions a Python web service with a **persistent disk** (paid disk/service may be required). Do not use an ephemeral free instance for retained evidence.
+2. Set `PROOFPATH_CORS_ORIGINS` to the exact allowed website origins (comma-separated, for example `https://YOUR-WEB-DOMAIN.vercel.app`). `PROOFPATH_ENV=production` is set in the blueprint. Disk paths are `PROOFPATH_DB_PATH=/var/data/proofpath.db` and `PROOFPATH_VAULT_DIR=/var/data/vault`.
+3. Confirm `https://YOUR-RENDER-HOST/api/health` responds and test case creation, file upload, export, and persistence across a service restart. Never place actual victim evidence in a publicly accessible demo.
+4. The server's current API does **not** implement per-user authentication/authorization. Keep the deployment restricted to synthetic data until that is implemented.
+
+### Frontend on Vercel
+
+- Project root directory: `mobile`; install: `npm install`; build: `npx expo export --platform web`; output: `dist`.
+- Set `EXPO_PUBLIC_API_BASE_URL=https://YOUR-RENDER-HOST` for web builds; redeploy after updating build-time environment variables.
+- **Important:** `mobile/vercel.json` currently proxies `/api/*` to the historical `proofpath-api-bhoomi-2fd6.vercel.app` demo API. Do **not** mistake that endpoint for the persistent Render backend. Before promoting a release, replace/remove that old proxy deliberately and test direct HTTPS API requests and CORS. The public `EXPO_PUBLIC_` value is not a secret.
+- Deploy branch previews first; promote to `main` only after a passing web build and an end-to-end test.
+
+### Android APK (not Expo Go)
+
+- `mobile/eas.json` defines a `preview` profile that produces an installable Android **APK**. Install EAS CLI, authenticate, then run `cd mobile && eas build --platform android --profile preview`.
+- Set `EXPO_PUBLIC_API_BASE_URL` to the **same HTTPS backend URL at build time** in the EAS environment. The APK cannot call your laptop's `localhost` or private LAN address after installation.
+- Native PDF saving/sharing is **not yet implemented** in the current mobile report preview: browser download works only on web. Do not claim Android PDF export is ready until tested on a device.
+- Test all five visible tabs, New Case, upload, evidence review, report export, Remedies, and SOS copy on a physical phone. SOS does **not** dispatch police or automatically deliver messages.
+
+### Release gate
+
+Do not merge deployment work merely because files exist. Check `npx tsc --noEmit`, Expo web export, backend tests, preview deployment logs, and a real end-to-end synthetic-data run. **Deployment is not proof of privacy or production safety.**
+
+---
+
 ## Table of Contents
 
 - [Problem Statement](#problem-statement)
