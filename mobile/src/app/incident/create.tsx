@@ -9,6 +9,7 @@ import { BottomTabInset, BrandColors, Colors, MaxContentWidth, Spacing } from '@
 import { useTranslation } from '@/context/LanguageContext';
 import { useCaseState } from '@/context/CaseContext';
 import { safeBack } from '@/utils/navigation';
+import { API_BASE_URL } from '@/services/api-case-service';
 
 export default function CreateIncidentScreen() {
   const { t } = useTranslation();
@@ -28,15 +29,19 @@ export default function CreateIncidentScreen() {
     setErrorMsg(null);
     try {
       const created = await createNewCase(title.trim(), description.trim());
+      // Case creation succeeded; an optional note must not make the user think it failed.
       if (initialClaim.trim()) {
-        await addClaimToCase(created.id, initialClaim.trim(), 'Primary Observation');
+        try {
+          await addClaimToCase(created.id, initialClaim.trim(), 'Primary Observation');
+        } catch (noteError) {
+          console.warn('Case created but optional statement could not be saved', noteError);
+        }
       }
       setCreatedNotice(true);
-      setTimeout(() => {
-        router.replace(`/incident/${created.id}` as any);
-      }, 1000);
+      router.replace(`/incident/${created.id}` as any);
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Failed to create record. Please ensure backend is reachable.');
+      const message = err instanceof Error ? err.message : String(err);
+      setErrorMsg(`Could not save your case. Your text is still here. Check that the backend is running and your phone can reach ${API_BASE_URL}. ${message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -58,7 +63,7 @@ export default function CreateIncidentScreen() {
             </Pressable>
             <ThemedText type="title">{t.incidentCreate.title}</ThemedText>
             <ThemedText type="default" style={styles.subtitle}>
-              Initiate a confidential, cryptographically backed case record. All timeline logs maintain SHA-256 auditability.
+              Give your record a name. You can add details and evidence later.
             </ThemedText>
           </View>
 
@@ -73,20 +78,20 @@ export default function CreateIncidentScreen() {
           {createdNotice ? (
             <ThemedView type="backgroundElement" style={styles.successBanner}>
               <ThemedText type="smallBold" style={styles.successText}>
-                ✓ Record successfully initialized and registered in local vault! Navigating...
+                ✓ Case saved. Opening your record...
               </ThemedText>
             </ThemedView>
           ) : (
             <ThemedView type="backgroundElement" style={styles.formCard}>
               <ThemedText type="smallBold" style={styles.fieldLabel}>
-                INCIDENT RECORD TITLE *
+                CASE NAME *
               </ThemedText>
               <TextInput
                 style={[
                   styles.input,
                   { color: colors.text, borderColor: isDark ? BrandColors.borderDark : BrandColors.border },
                 ]}
-                placeholder="e.g. Workplace Disciplinary Escalation / Notice"
+                placeholder="e.g. Messages I want to keep"
                 placeholderTextColor={BrandColors.muted}
                 value={title}
                 onChangeText={setTitle}
@@ -94,7 +99,7 @@ export default function CreateIncidentScreen() {
               />
 
               <ThemedText type="smallBold" style={styles.fieldLabel}>
-                SUMMARY & CONTEXT NOTE
+                WHAT HAPPENED? (OPTIONAL)
               </ThemedText>
               <TextInput
                 style={[
@@ -102,7 +107,7 @@ export default function CreateIncidentScreen() {
                   styles.textArea,
                   { color: colors.text, borderColor: isDark ? BrandColors.borderDark : BrandColors.border },
                 ]}
-                placeholder="Describe what occurred, dates, parties involved, or key background details..."
+                placeholder="Write as much or as little as you want."
                 placeholderTextColor={BrandColors.muted}
                 multiline
                 numberOfLines={3}
@@ -112,14 +117,14 @@ export default function CreateIncidentScreen() {
               />
 
               <ThemedText type="smallBold" style={styles.fieldLabel}>
-                INITIAL FACT OR CLAIM (OPTIONAL)
+                ONE IMPORTANT DETAIL (OPTIONAL)
               </ThemedText>
               <TextInput
                 style={[
                   styles.input,
                   { color: colors.text, borderColor: isDark ? BrandColors.borderDark : BrandColors.border },
                 ]}
-                placeholder="e.g. Received unannounced termination notice without prior PIP"
+                placeholder="e.g. I received another message after asking them to stop"
                 placeholderTextColor={BrandColors.muted}
                 value={initialClaim}
                 onChangeText={setInitialClaim}
@@ -137,7 +142,7 @@ export default function CreateIncidentScreen() {
                   <ActivityIndicator color="#ffffff" size="small" />
                 ) : (
                   <ThemedText type="smallBold" style={styles.submitButtonText}>
-                    Initialize Cryptographic Record →
+                    Save my case →
                   </ThemedText>
                 )}
               </Pressable>
