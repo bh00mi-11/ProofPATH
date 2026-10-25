@@ -1,3 +1,4 @@
+import type { Href } from 'expo-router';
 import React from 'react';
 import {
   StyleSheet,
@@ -66,7 +67,7 @@ export default function HomeScreen() {
                 hovered && styles.guardianButtonHovered,
                 pressed && styles.pressed,
               ]}
-              onPress={() => router.push('/guardian')}
+              onPress={() => router.push('/guardian' as Href)}
               accessibilityRole="button"
               accessibilityLabel="Open Guardian Mode"
             >

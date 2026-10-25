@@ -1,3 +1,4 @@
+import type { Href } from 'expo-router';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
@@ -172,7 +173,7 @@ export default function NextStepNavigatorScreen() {
             </View>
             <Pressable
               style={styles.supportNavItem}
-              onPress={() => router.push('/accountability')}
+              onPress={() => router.push('/accountability' as Href)}
             >
               <ThemedText style={styles.supportNavTextInactive}>
                 📋 Accountability Trail →
@@ -180,7 +181,7 @@ export default function NextStepNavigatorScreen() {
             </Pressable>
             <Pressable
               style={styles.supportNavItem}
-              onPress={() => router.push('/legal-context')}
+              onPress={() => router.push('/legal-context' as Href)}
             >
               <ThemedText style={styles.supportNavTextInactive}>
                 ⚖️ Legal Context →
@@ -188,7 +189,7 @@ export default function NextStepNavigatorScreen() {
             </Pressable>
             <Pressable
               style={styles.supportNavItem}
-              onPress={() => router.push('/remedies')}
+              onPress={() => router.push('/remedies' as Href)}
             >
               <ThemedText style={styles.supportNavTextInactive}>
                 🏛️ Victim Remedies →
