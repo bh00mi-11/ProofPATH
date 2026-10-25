@@ -33,8 +33,10 @@ function resolveDefaultApiBase(): string {
     }
     return configured;
   }
-  // When running in a browser (web), route to same host on port 8000 automatically
+  // Deployed Expo web builds reverse-proxy /api through Vercel to the read-only demo API.
+  // Never request insecure http://<host>:8000 from an HTTPS site.
   if (typeof window !== 'undefined' && window.location && window.location.hostname) {
+    if (window.location.hostname.endsWith('.vercel.app')) return window.location.origin;
     return `http://${window.location.hostname}:8000`;
   }
   // On a physical phone, localhost points to the phone, not the development computer.
