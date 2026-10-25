@@ -105,6 +105,9 @@ export class ApiError extends Error {
   }
 }
 
+export let activeAuthToken: string | null = null;
+export function setAuthToken(token: string | null) { activeAuthToken = token; }
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
   const controller = new AbortController();
@@ -116,6 +119,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       signal: controller.signal,
       headers: {
         'Accept': 'application/json',
+        ...(activeAuthToken ? { Authorization: `Bearer ${activeAuthToken}` } : {}),
         ...(options.headers || {}),
       },
     });
