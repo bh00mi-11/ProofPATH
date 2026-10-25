@@ -72,7 +72,7 @@ import { useTranslation } from '@/context/LanguageContext';
 export default function AccountabilityTrailScreen() {
   const { t } = useTranslation();
   const { currentCase, evidence } = useCaseState();
-  const caseId = currentCase?.id || 'case_demo_01';
+  const caseId = currentCase?.id;
 
   const [data, setData] = useState<AccountabilityTimeline | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -100,6 +100,7 @@ export default function AccountabilityTrailScreen() {
     setLoading(true);
     setError(null);
     try {
+      if (!caseId) { setError('Create or select a case first.'); return; }
       const res = await apiCaseService.getAccountabilityTimeline(caseId);
       setData(res);
     } catch (err: any) {
