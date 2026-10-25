@@ -7,9 +7,9 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
-      - key: ENV_MODE
+      - key: PROOFPATH_ENV
         value: production
-      - key: ALLOWED_ORIGINS
+      - key: PROOFPATH_CORS_ORIGINS
         sync: false
       - key: PROOFPATH_DB_PATH
         value: /var/data/proofpath.db
