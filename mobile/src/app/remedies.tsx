@@ -57,7 +57,7 @@ const ELIGIBILITY_CONFIG: Record<
 export default function VictimJusticeRemediesScreen() {
   const { t } = useTranslation();
   const { currentCase } = useCaseState();
-  const caseId = currentCase?.id || 'case_demo_01';
+  const caseId = currentCase?.id;
 
   const [data, setData] = useState<RemediesResult | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -67,6 +67,7 @@ export default function VictimJusticeRemediesScreen() {
     setLoading(true);
     setError(null);
     try {
+      if (!caseId) { setError('Create or select a case first.'); return; }
       const res = await apiCaseService.getRemedies(caseId);
       setData(res);
     } catch (err: any) {
