@@ -84,7 +84,7 @@ export function CaseProvider({ children }: { children: ReactNode }) {
   const [backendError, setBackendError] = useState<string | null>(null);
 
   const [availableCases, setAvailableCases] = useState<IncidentCase[]>([]);
-  const [currentCaseId, setCurrentCaseId] = useState<string>('case_demo_01');
+  const [currentCaseId, setCurrentCaseId] = useState<string>('');
 
   // Initial load and reload of case data
   const refreshData = useCallback(async (targetCaseId?: string) => {
@@ -94,18 +94,22 @@ export function CaseProvider({ children }: { children: ReactNode }) {
       const allCases = await apiCaseService.getCases().catch(() => []);
       setAvailableCases(allCases);
 
-      let activeId = targetCaseId || currentCaseId;
-      if (!activeId || activeId === 'case_demo_01') {
-        if (targetCaseId) {
-          activeId = targetCaseId;
-        } else if (currentCaseId && allCases.some((c) => c.id === currentCaseId)) {
-          activeId = currentCaseId;
-        } else if (allCases.length > 0) {
-          const nonDemoCases = allCases.filter((c) => c.id !== 'case_demo_01');
-          activeId = nonDemoCases.length > 0 ? nonDemoCases[nonDemoCases.length - 1].id : allCases[0].id;
-        } else {
-          activeId = 'case_demo_01';
-        }
+      // Authenticated users may only open their own cases; never fall back to the
+      // globally seeded demo case (it is not owned by a newly registered user).
+      const activeId = targetCaseId && allCases.some(c => c.id === targetCaseId)
+        ? targetCaseId
+        : currentCaseId && allCases.some(c => c.id === currentCaseId)
+          ? currentCaseId
+          : allCases[0]?.id;
+      if (!activeId) {
+        setCurrentCaseId('');
+        setCurrentCase(null);
+        setEvidence([]);
+        setObservations([]);
+        setClaims([]);
+        setScenarioResult(null);
+        setDisclosurePreview(null);
+        return;
       }
 
       const [fullData, initialScenario, initialPreview] =
