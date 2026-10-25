@@ -140,4 +140,4 @@ cd ../mobile && npx tsc --noEmit
 
 **Demo path:** Register → Create your own case → Add synthetic evidence → Review claims → Stress Test / Time Machine → Privacy Lens → Confirm and export PDF → Record an accountability follow-up.
 
-**Limitations:** Authentication and admin review are MVP implementations, not a completed security audit. Cross-user authorization and native PDF flows require device-level regression testing. SQLite/local files are for a controlled demo. SHA-256 checks file integrity, not authenticity; admin review does not independently verify events. This is not emergency response or legal advice. **Use fictional data only.**
+**Limitations:** Authentication and admin review are MVP implementations, not a completed security audit. Cross-user authorization needs security regression tests, and native PDF sharing needs device-level validation. SQLite/local files are for a controlled demo. SHA-256 checks file integrity, not authenticity; admin review does not independently verify events. This is not emergency response or legal advice. **Use fictional data only.**
