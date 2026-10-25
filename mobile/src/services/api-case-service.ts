@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
 import Constants from 'expo-constants';
 import type { ICaseService } from './case-service';
 import type {
@@ -606,7 +607,7 @@ export const apiCaseService: ICaseService & {
     recipient: RecipientType,
     confirmedConfig: boolean,
     redactedTerms: string[] = []
-  ): Promise<Blob> {
+  ): Promise<Blob | { uri: string; size: number }> {
     const url = `${API_BASE_URL}/api/export/pdf`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20000);
@@ -650,6 +651,24 @@ export const apiCaseService: ICaseService & {
         throw new ApiError('Invalid PDF format returned from server (missing %PDF- header)', 500);
       }
 
+      if (Platform.OS !== 'web') {
+        // React Native's Blob polyfill rejects ArrayBuffer and ArrayBufferView.
+        // Save the validated PDF directly to a native file instead.
+        const bytes = new Uint8Array(arrayBuffer);
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+        const chunks: string[] = [];
+        for (let i = 0; i < bytes.length; i += 3) {
+          const a = bytes[i], b = i + 1 < bytes.length ? bytes[i + 1] : 0;
+          const c = i + 2 < bytes.length ? bytes[i + 2] : 0;
+          chunks.push(alphabet[a >> 2] + alphabet[((a & 3) << 4) | (b >> 4)] +
+            (i + 1 < bytes.length ? alphabet[((b & 15) << 2) | (c >> 6)] : '=') +
+            (i + 2 < bytes.length ? alphabet[c & 63] : '='));
+        }
+        const base64 = chunks.join('');
+        const uri = `${FileSystem.cacheDirectory}ProofPath_Report_${caseId}_${recipient.toLowerCase()}.pdf`;
+        await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
+        return { uri, size: bytes.length };
+      }
       return new Blob([arrayBuffer], { type: 'application/pdf' });
     } catch (err: any) {
       if (err instanceof ApiError) throw err;
