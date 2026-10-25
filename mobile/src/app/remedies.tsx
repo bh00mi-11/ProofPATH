@@ -167,7 +167,7 @@ export default function VictimJusticeRemediesScreen() {
                 {/* Quick Evidence State */}
                 <View style={styles.factsRow}>
                   <ThemedText style={styles.factsText}>
-                    <b>Known Record:</b> {data.evidence_summary.supported_claims} supported claim(s),{' '}
+                    <ThemedText style={{ fontWeight: '700' }}>Known Record:</ThemedText> {data.evidence_summary.supported_claims} supported claim(s),{' '}
                     {data.evidence_summary.total_artifacts} evidence artifact(s) in vault.
                     {data.evidence_summary.conflicted_claims > 0
                       ? ` (${data.evidence_summary.conflicted_claims} conflict(s) require resolution)`
