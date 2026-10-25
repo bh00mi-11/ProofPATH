@@ -665,7 +665,14 @@ export const apiCaseService: ICaseService & {
             (i + 2 < bytes.length ? alphabet[c & 63] : '='));
         }
         const base64 = chunks.join('');
-        const uri = `${FileSystem.cacheDirectory}ProofPath_Report_${caseId}_${recipient.toLowerCase()}.pdf`;
+        // Expo Go's scoped cache directory is not guaranteed to exist yet.
+        // Create our own output directory before writing the PDF.
+        const root = FileSystem.documentDirectory || FileSystem.cacheDirectory;
+        if (!root) throw new Error('Native document storage is unavailable');
+        const directory = `${root}proofpath-reports/`;
+        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+        const safeCaseId = caseId.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const uri = `${directory}ProofPath_Report_${safeCaseId}_${recipient.toLowerCase()}.pdf`;
         await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
         return { uri, size: bytes.length };
       }
