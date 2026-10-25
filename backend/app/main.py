@@ -223,11 +223,21 @@ async def enforce_case_ownership(request: Request, call_next):
         if not row:
             return JSONResponse({"detail": "Not found"}, status_code=404)
         case_id = row["case_id"]
+    # Body-scoped endpoints must be authorized before reaching their handlers.
+    if not case_id and request.method in {"POST", "PUT", "DELETE"} and path not in {"/api/cases", "/api/auth/logout"}:
+        try:
+            payload = await request.json()
+            if isinstance(payload, dict):
+                case_id = payload.get("case_id")
+        except Exception:
+            pass
     if path.startswith("/api/claim-links") and not case_id:
         return JSONResponse({"detail": "Case identifier required"}, status_code=403)
     if path.startswith("/api/") and request.method in {"POST", "PUT", "DELETE"} and path not in {"/api/cases", "/api/auth/logout"} and not case_id:
         # Fail closed until every body-based endpoint is explicitly scoped.
         return JSONResponse({"detail": "Endpoint requires ownership enforcement before use"}, status_code=403)
+    if path == "/api/auth/me" or path == "/api/auth/logout":
+        return await call_next(request)
     if case_id and not auth.owns_case(user["id"], case_id):
         return JSONResponse({"detail": "Case not found"}, status_code=404)
     return await call_next(request)
