@@ -177,7 +177,7 @@ export default function GuardianScreen() {
       const res = await fetch(`${API_BASE_URL}/api/guardian/sessions/${activeSession.id}/sos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ session_id: activeSession.id, share_channel: 'MANUAL_SHARE' }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -192,6 +192,10 @@ export default function GuardianScreen() {
   };
 
   const confirmSOS = () => {
+    if (Platform.OS === 'web') {
+      setStatusMessage('SOS records are manual-only. Use Guardian Mode on your phone to confirm an attempt. Call 112 directly in an emergency.');
+      return;
+    }
     Alert.alert('Record an SOS attempt?', 'This logs an alert attempt only. It does not confirm SMS delivery, dispatch police, or share live location.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Record attempt', onPress: handleTriggerSOS },
