@@ -1,3 +1,4 @@
+import type { Href } from 'expo-router';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
@@ -279,12 +280,12 @@ export default function LegalContextScreen() {
             <View style={styles.actionButtonsRow}>
               <Pressable
                 style={styles.actionBtnSecondary}
-                onPress={() => router.push('/accountability')}>
+                onPress={() => router.push('/accountability' as Href)}>
                 <ThemedText style={styles.actionBtnSecondaryText}>📋 Trail</ThemedText>
               </Pressable>
               <Pressable
                 style={styles.actionBtnSecondary}
-                onPress={() => router.push('/stress-test')}>
+                onPress={() => router.push('/stress-test' as Href)}>
                 <ThemedText style={styles.actionBtnSecondaryText}>⚡ Stress Test</ThemedText>
               </Pressable>
               <Pressable
