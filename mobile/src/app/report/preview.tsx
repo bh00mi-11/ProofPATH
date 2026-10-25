@@ -404,18 +404,24 @@ export default function ReportPreviewScreen() {
                   DOCUMENT READY FOR SHARING:
                 </ThemedText>
                 <View style={styles.downloadBtnGroup}>
-                  <Pressable
-                    style={styles.downloadActionBtn}
-                    onPress={() => triggerDownload(pdfBlob)}
-                  >
-                    <ThemedText style={styles.downloadActionBtnText}>📥 Download PDF</ThemedText>
-                  </Pressable>
-                  <Pressable
-                    style={styles.openActionBtn}
-                    onPress={() => triggerOpen(pdfBlob)}
-                  >
-                    <ThemedText style={styles.openActionBtnText}>↗ Open PDF in Tab</ThemedText>
-                  </Pressable>
+                  {nativePdfUri ? (
+                    <Pressable style={styles.downloadActionBtn} onPress={async () => {
+                      if (await Sharing.isAvailableAsync()) {
+                        await Sharing.shareAsync(nativePdfUri, { mimeType: 'application/pdf', dialogTitle: 'Share ProofPATH report' });
+                      }
+                    }}>
+                      <ThemedText style={styles.downloadActionBtnText}>📤 Share / Save PDF</ThemedText>
+                    </Pressable>
+                  ) : pdfBlob ? (
+                    <>
+                      <Pressable style={styles.downloadActionBtn} onPress={() => triggerDownload(pdfBlob)}>
+                        <ThemedText style={styles.downloadActionBtnText}>📥 Download PDF</ThemedText>
+                      </Pressable>
+                      <Pressable style={styles.openActionBtn} onPress={() => triggerOpen(pdfBlob)}>
+                        <ThemedText style={styles.openActionBtnText}>↗ Open PDF in Tab</ThemedText>
+                      </Pressable>
+                    </>
+                  ) : null}
                 </View>
               </View>
             ) : null}
