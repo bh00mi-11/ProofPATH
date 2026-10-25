@@ -191,6 +191,35 @@ def compare_scenario_with_baseline(
     changes = []
     affected_claim_ids = []
 
+    # Map observation IDs to human-readable filenames and field names
+    obs_meta_map = {}
+    art_filename_map = {a["id"]: a.get("filename", a["id"]) for a in artifacts}
+    for obs in observations:
+        oid = obs["id"]
+        art_id = obs.get("artifact_id")
+        fname = art_filename_map.get(art_id, "direct statement") if art_id else "direct statement"
+        field_name = obs.get("field", "detail")
+        obs_meta_map[oid] = f"{fname} ({field_name})"
+
+    def format_sources(oid_set: Set[str]) -> str:
+        # Group by filename for clean reporting
+        files_to_fields: Dict[str, Set[str]] = {}
+        for oid in oid_set:
+            meta = obs_meta_map.get(oid, oid)
+            if " (" in meta and meta.endswith(")"):
+                fname, fld = meta[:-1].split(" (", 1)
+                files_to_fields.setdefault(fname, set()).add(fld)
+            else:
+                files_to_fields.setdefault(meta, set())
+
+        summaries = []
+        for fname, flds in sorted(files_to_fields.items()):
+            if flds:
+                summaries.append(f"'{fname}' [{', '.join(sorted(flds))}]")
+            else:
+                summaries.append(f"'{fname}'")
+        return "; ".join(summaries)
+
     for c in claims:
         cid = c["id"]
         base_c = baseline_claim_map[cid]
@@ -212,19 +241,19 @@ def compare_scenario_with_baseline(
             
             removed_supporting = set(base_c["supporting_observations"]) - set(scen_c["supporting_observations"])
             if removed_supporting:
-                diff_reason_parts.append(f"Lost supporting observation(s): {sorted(list(removed_supporting))}.")
+                diff_reason_parts.append(f"Lost supporting evidence: {format_sources(removed_supporting)}.")
 
             added_supporting = set(scen_c["supporting_observations"]) - set(base_c["supporting_observations"])
             if added_supporting:
-                diff_reason_parts.append(f"Gained supporting observation(s): {sorted(list(added_supporting))}.")
+                diff_reason_parts.append(f"Gained supporting evidence: {format_sources(added_supporting)}.")
 
             removed_contradicting = set(base_c["contradicting_observations"]) - set(scen_c["contradicting_observations"])
             if removed_contradicting:
-                diff_reason_parts.append(f"Removed conflicting observation(s): {sorted(list(removed_contradicting))}.")
+                diff_reason_parts.append(f"Removed conflicting evidence: {format_sources(removed_contradicting)}.")
 
             added_contradicting = set(scen_c["contradicting_observations"]) - set(base_c["contradicting_observations"])
             if added_contradicting:
-                diff_reason_parts.append(f"Added conflicting observation(s): {sorted(list(added_contradicting))}.")
+                diff_reason_parts.append(f"Added conflicting evidence: {format_sources(added_contradicting)}.")
 
             diff_reason = " ".join(diff_reason_parts) if diff_reason_parts else scen_c["reason"]
 

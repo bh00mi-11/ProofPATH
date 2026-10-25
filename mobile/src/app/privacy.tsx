@@ -74,6 +74,11 @@ export default function PrivacyScreen() {
                 <View style={styles.casePickerRow}>
                   {availableCases.map((c) => {
                     const isSelected = c.id === currentCase?.id;
+                    const isDuplicateTitle = availableCases.filter((item) => item.title === c.title).length > 1;
+                    const shortId = c.id.replace(/^case_/, '');
+                    const baseTitle = c.title ? (c.title.length > 18 ? `${c.title.slice(0, 18)}...` : c.title) : c.id;
+                    const displayLabel = isDuplicateTitle ? `${baseTitle} (#${shortId.slice(0, 4)})` : baseTitle;
+
                     return (
                       <Pressable
                         key={c.id}
@@ -84,7 +89,7 @@ export default function PrivacyScreen() {
                           type="smallBold"
                           style={isSelected ? styles.caseSelectorPillTextActive : styles.caseSelectorPillTextInactive}
                         >
-                          {c.title ? (c.title.length > 20 ? `${c.title.slice(0, 20)}...` : c.title) : c.id}
+                          {displayLabel}
                         </ThemedText>
                       </Pressable>
                     );

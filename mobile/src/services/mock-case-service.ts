@@ -78,7 +78,8 @@ export class MockCaseService implements ICaseService {
 
   async getDisclosurePreview(
     recipient: RecipientType,
-    includedFields: string[]
+    includedFields: string[],
+    _caseId?: string
   ): Promise<DisclosurePreview> {
     const excludedFields = ALL_DISCLOSURE_FIELDS.filter(
       (field) => !includedFields.includes(field)

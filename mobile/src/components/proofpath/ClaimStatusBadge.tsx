@@ -14,25 +14,25 @@ const STATUS_CONFIG: Record<
   { label: string; bg: string; border: string; text: string }
 > = {
   SUPPORTED: {
-    label: '✓ Supported by saved evidence',
+    label: '✓ SUPPORTED (Supported by saved evidence)',
     bg: '#ECFDF5',
     border: '#A7F3D0',
     text: '#059669',
   },
   CONFLICTED: {
-    label: "✕ Information doesn't match",
+    label: "✕ CONFLICTED (Information doesn't match)",
     bg: '#FEF2F2',
     border: '#FECACA',
     text: '#DC2626',
   },
   REVIEW_NEEDED: {
-    label: '⚠ Needs your review',
+    label: '⚠ REVIEW_NEEDED (Needs your review)',
     bg: '#FFFBEB',
     border: '#FDE68A',
     text: '#D97706',
   },
   UNVERIFIED: {
-    label: '○ Not enough information yet',
+    label: '○ UNVERIFIED (Not enough information yet)',
     bg: '#F1F5F9',
     border: '#CBD5E1',
     text: '#475569',

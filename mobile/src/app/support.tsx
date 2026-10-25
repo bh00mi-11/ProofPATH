@@ -22,7 +22,7 @@ import { useTranslation } from '@/context/LanguageContext';
 
 export default function NextStepNavigatorScreen() {
   const { t } = useTranslation();
-  const { currentCase } = useCaseState();
+  const { currentCase, availableCases, selectCase } = useCaseState();
   const caseId = currentCase?.id || 'case_demo_01';
 
   const [data, setData] = useState<NavigatorData | null>(null);
@@ -124,6 +124,43 @@ export default function NextStepNavigatorScreen() {
             <ThemedText type="default" style={styles.subtitle}>
               Deterministic action checklists, verified Indian statutory helplines, and institutional reporting guidance.
             </ThemedText>
+
+            {/* Case Selection Pills */}
+            {availableCases && availableCases.length > 1 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.casePickerRow}
+              >
+                {availableCases.map((c) => {
+                  const isSelected = c.id === currentCase?.id;
+                  const duplicates = availableCases.filter((item) => item.title === c.title);
+                  const isDuplicateTitle = duplicates.length > 1;
+                  const shortId = c.id.replace('case_', '').slice(0, 4);
+                  const displayLabel = isDuplicateTitle ? `${c.title} (#${shortId})` : c.title;
+
+                  return (
+                    <Pressable
+                      key={c.id}
+                      style={[
+                        styles.caseSelectorPill,
+                        isSelected && styles.caseSelectorPillActive,
+                      ]}
+                      onPress={() => selectCase(c.id)}
+                    >
+                      <ThemedText
+                        style={[
+                          styles.caseSelectorText,
+                          isSelected && styles.caseSelectorTextActive,
+                        ]}
+                      >
+                        {displayLabel}
+                      </ThemedText>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
 
           {/* 4 Pillars Navigation Bar inside Support Workspace */}
@@ -770,5 +807,31 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
+  },
+  casePickerRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+    paddingBottom: 4,
+  },
+  caseSelectorPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: Colors.light.backgroundSubtle,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  caseSelectorPillActive: {
+    backgroundColor: BrandColors.indigo,
+    borderColor: BrandColors.indigo,
+  },
+  caseSelectorText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.light.textSecondary,
+  },
+  caseSelectorTextActive: {
+    color: '#ffffff',
   },
 });

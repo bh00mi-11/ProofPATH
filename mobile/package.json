@@ -43,7 +43,8 @@
     "android": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --android",
     "ios": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --ios",
     "web": "cross-env NODE_OPTIONS=--max-old-space-size=4096 expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "postinstall": "node ./scripts/patch-metro-onedrive.js"
   },
   "private": true
 }

@@ -14,6 +14,8 @@ export default function TimeMachineScreen() {
   const { t } = useTranslation();
   const {
     currentCase,
+    availableCases,
+    selectCase,
     evidence,
     observations,
     claims,
@@ -52,9 +54,36 @@ export default function TimeMachineScreen() {
               <View style={styles.workspacePill}>
                 <ThemedText style={styles.workspacePillText}>ANALYSIS WORKSPACE</ThemedText>
               </View>
-              <ThemedText type="small" style={styles.caseBadge}>
-                {currentCase?.title || 'Case Analysis'}
-              </ThemedText>
+              {availableCases.length > 1 ? (
+                <View style={styles.casePickerRow}>
+                  {availableCases.map((c) => {
+                    const isSelected = c.id === currentCase?.id;
+                    const isDuplicateTitle = availableCases.filter((item) => item.title === c.title).length > 1;
+                    const shortId = c.id.replace(/^case_/, '');
+                    const baseTitle = c.title ? (c.title.length > 18 ? `${c.title.slice(0, 18)}...` : c.title) : c.id;
+                    const displayLabel = isDuplicateTitle ? `${baseTitle} (#${shortId.slice(0, 4)})` : baseTitle;
+
+                    return (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => selectCase(c.id)}
+                        style={[styles.caseSelectorPill, isSelected && styles.caseSelectorPillActive]}
+                      >
+                        <ThemedText
+                          type="smallBold"
+                          style={isSelected ? styles.caseSelectorPillTextActive : styles.caseSelectorPillTextInactive}
+                        >
+                          {displayLabel}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : (
+                <ThemedText type="small" style={styles.caseBadge}>
+                  {currentCase?.title || 'Case Analysis'}
+                </ThemedText>
+              )}
             </View>
             <ThemedText type="title">{t.timeMachine.title}</ThemedText>
             <ThemedText type="default" style={styles.subtitle}>
@@ -150,12 +179,19 @@ export default function TimeMachineScreen() {
             </ThemedView>
           ) : (
             scenarioResult?.changes.map((change) => {
-              const statementText = claims.find((c) => c.id === change.claimId)?.text;
+              const statementText = claims.find((c) => c.id === change.claimId)?.text || (change as any).claimText || change.claimId;
+              const excludedNames = excludedEvidenceIds
+                .map((eid) => evidence.find((e) => e.id === eid)?.name)
+                .filter(Boolean) as string[];
+
               return (
                 <ClaimChangeCard
                   key={change.claimId}
                   change={change}
                   claimStatement={statementText}
+                  excludedEvidenceNames={excludedNames}
+                  evidenceList={evidence.map((e) => ({ id: e.id, name: e.name }))}
+                  observationsList={observations.map((o) => ({ id: o.id, evidenceId: o.evidenceId, field: o.field || '' }))}
                 />
               );
             })
@@ -372,5 +408,31 @@ const styles = StyleSheet.create({
   baselineNoticeDesc: {
     color: Colors.light.textSecondary,
     lineHeight: 18,
+  },
+  casePickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    alignItems: 'center',
+  },
+  caseSelectorPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+    backgroundColor: Colors.light.backgroundSubtle,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  caseSelectorPillActive: {
+    backgroundColor: BrandColors.indigoLight,
+    borderColor: BrandColors.indigoBorder,
+  },
+  caseSelectorPillTextActive: {
+    color: BrandColors.indigo,
+    fontSize: 11,
+  },
+  caseSelectorPillTextInactive: {
+    color: Colors.light.textSecondary,
+    fontSize: 11,
   },
 });

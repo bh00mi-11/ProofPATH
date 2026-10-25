@@ -17,7 +17,7 @@ import { useTranslation } from '@/context/LanguageContext';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { currentCase, evidence, claims, isLoading, backendError, refreshData } = useCaseState();
+  const { currentCase, availableCases, selectCase, evidence, claims, isLoading, backendError, refreshData } = useCaseState();
   const { t } = useTranslation();
   const { width } = useWindowDimensions();
 
@@ -42,7 +42,7 @@ export default function HomeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Executive Platform Safety Ribbon */}
+        {/* Top Safety Ribbon */}
         <View style={styles.emergencyRibbon}>
           <View style={styles.emergencyLeft}>
             <View style={styles.emergencyBadge}>
@@ -83,7 +83,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Hero Section: Clean, cohesive executive presentation */}
+        {/* Hero Section: Clear value proposition */}
         <View style={[styles.heroCard, isDesktop && styles.desktopHeroCard]}>
           <View style={styles.heroContent}>
             <View style={styles.categoryPill}>
@@ -99,20 +99,37 @@ export default function HomeScreen() {
             </ThemedText>
 
             <View style={styles.heroCtaRow}>
-              <Pressable
-                style={({ hovered, pressed }: any) => [
-                  styles.primaryCta,
-                  hovered && styles.primaryCtaHovered,
-                  pressed && styles.pressed,
-                ]}
-                onPress={() => router.push('/incident/create')}
-                accessibilityRole="button"
-                accessibilityLabel="Create New Incident Record"
-              >
-                <ThemedText style={styles.primaryCtaText}>
-                  Start a private record
-                </ThemedText>
-              </Pressable>
+              {currentCase ? (
+                <Pressable
+                  style={({ hovered, pressed }: any) => [
+                    styles.primaryCta,
+                    hovered && styles.primaryCtaHovered,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={() => router.push('/evidence')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue Active Case"
+                >
+                  <ThemedText style={styles.primaryCtaText}>
+                    Continue Case: {currentCase.title ? (currentCase.title.length > 16 ? `${currentCase.title.slice(0, 16)}...` : currentCase.title) : 'Active Case'} →
+                  </ThemedText>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={({ hovered, pressed }: any) => [
+                    styles.primaryCta,
+                    hovered && styles.primaryCtaHovered,
+                    pressed && styles.pressed,
+                  ]}
+                  onPress={() => router.push('/incident/create')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Create New Incident Record"
+                >
+                  <ThemedText style={styles.primaryCtaText}>
+                    + Start a Private Record
+                  </ThemedText>
+                </Pressable>
+              )}
 
               <Pressable
                 style={({ hovered, pressed }: any) => [
@@ -120,12 +137,12 @@ export default function HomeScreen() {
                   hovered && styles.secondaryCtaHovered,
                   pressed && styles.pressed,
                 ]}
-                onPress={() => router.push('/evidence')}
+                onPress={() => router.push('/incident/create')}
                 accessibilityRole="button"
-                accessibilityLabel="View evidence vault"
+                accessibilityLabel="Create another case"
               >
                 <ThemedText style={styles.secondaryCtaText}>
-                  See saved items
+                  + New Case
                 </ThemedText>
               </Pressable>
             </View>
@@ -150,6 +167,30 @@ export default function HomeScreen() {
               </Pressable>
             </View>
 
+            {availableCases && availableCases.length > 1 && (
+              <View style={styles.caseSwitcherHeader}>
+                <ThemedText type="small" style={styles.caseSwitchPrompt}>Switch Case:</ThemedText>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.casePillScroll}>
+                  {availableCases.map((c) => {
+                    const isSelected = c.id === currentCase?.id;
+                    const shortId = c.id.replace(/^case_/, '').slice(0, 4);
+                    const label = c.title ? (c.title.length > 15 ? `${c.title.slice(0, 15)}...` : c.title) : c.id;
+                    return (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => selectCase(c.id)}
+                        style={[styles.homeCasePill, isSelected && styles.homeCasePillActive]}
+                      >
+                        <ThemedText style={isSelected ? styles.homeCasePillTextActive : styles.homeCasePillTextInactive}>
+                          {label} (#{shortId})
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
             <View style={styles.metricGrid}>
               <View style={styles.metricItem}>
                 <ThemedText style={styles.metricNumber}>{evidenceCount}</ThemedText>
@@ -158,12 +199,12 @@ export default function HomeScreen() {
               <View style={styles.metricDivider} />
               <View style={styles.metricItem}>
                 <ThemedText style={styles.metricNumber}>{claimsCount}</ThemedText>
-                <ThemedText style={styles.metricLabel}>Claims</ThemedText>
+                <ThemedText style={styles.metricLabel}>Statements</ThemedText>
               </View>
               <View style={styles.metricDivider} />
               <View style={styles.metricItem}>
                 <ThemedText style={styles.metricNumber}>{eventsCount}</ThemedText>
-                <ThemedText style={styles.metricLabel}>Entries</ThemedText>
+                <ThemedText style={styles.metricLabel}>Details</ThemedText>
               </View>
             </View>
 
@@ -185,19 +226,19 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {/* 4 Core Workflow Pillars */}
+        {/* 5-Step Guided Journey */}
         <View style={styles.pillarsSection}>
           <View style={styles.sectionHeader}>
             <ThemedText type="headline" style={styles.sectionTitle}>
-              What would you like to do?
+              Your 5-Step Documentation Journey
             </ThemedText>
             <ThemedText style={styles.sectionDescription}>
-              Start with one small step. You can come back anytime.
+              Follow these continuous steps to build a tamper-resistant record without losing your active case.
             </ThemedText>
           </View>
 
           <View style={[styles.pillarGrid, isWide && styles.pillarGridWide]}>
-            {/* Pillar 1: Evidence */}
+            {/* Step 1: Save Evidence */}
             <Pressable
               style={({ hovered, pressed }: any) => [
                 styles.pillarCard,
@@ -209,22 +250,51 @@ export default function HomeScreen() {
               accessibilityLabel="Navigate to Evidence Vault"
             >
               <View style={[styles.pillarIconBadge, { backgroundColor: BrandColors.indigoLight }]}>
-                <ThemedText style={styles.pillarIconEmoji}>🗄</ThemedText>
+                <ThemedText style={styles.pillarIconEmoji}>📁</ThemedText>
               </View>
+              <ThemedText style={styles.stepCounterText}>STEP 1</ThemedText>
               <ThemedText type="title2" style={styles.pillarTitle}>
-                {t.navigation.evidenceTimeline}
+                Save Evidence
               </ThemedText>
               <ThemedText style={styles.pillarText}>
-                {t.home.evidenceVaultDesc}
+                Add messages, screenshots, and call logs. ProofPath computes cryptographic SHA-256 digests instantly.
               </ThemedText>
               <View style={styles.pillarLinkRow}>
                 <ThemedText style={[styles.pillarLink, { color: BrandColors.indigo }]}>
-                  {t.common.view} {t.navigation.evidenceTimeline} →
+                  Open Evidence Vault →
                 </ThemedText>
               </View>
             </Pressable>
 
-            {/* Pillar 2: Analysis */}
+            {/* Step 2: Review Claims */}
+            <Pressable
+              style={({ hovered, pressed }: any) => [
+                styles.pillarCard,
+                hovered && styles.pillarCardHovered,
+                pressed && styles.pressed,
+              ]}
+              onPress={() => router.push('/evidence')}
+              accessibilityRole="button"
+              accessibilityLabel="Navigate to Claims Review"
+            >
+              <View style={[styles.pillarIconBadge, { backgroundColor: BrandColors.purpleLight }]}>
+                <ThemedText style={styles.pillarIconEmoji}>⚖</ThemedText>
+              </View>
+              <ThemedText style={styles.stepCounterText}>STEP 2</ThemedText>
+              <ThemedText type="title2" style={styles.pillarTitle}>
+                Review Statements
+              </ThemedText>
+              <ThemedText style={styles.pillarText}>
+                Link factual details to your statements and understand what evidence SUPPORTS or CONTRADICTS each claim.
+              </ThemedText>
+              <View style={styles.pillarLinkRow}>
+                <ThemedText style={[styles.pillarLink, { color: BrandColors.purple }]}>
+                  Trace Engine Assessment →
+                </ThemedText>
+              </View>
+            </Pressable>
+
+            {/* Step 3: Test Changes (Time Machine & Stress Test) */}
             <Pressable
               style={({ hovered, pressed }: any) => [
                 styles.pillarCard,
@@ -233,25 +303,26 @@ export default function HomeScreen() {
               ]}
               onPress={() => router.push('/time-machine')}
               accessibilityRole="button"
-              accessibilityLabel="Navigate to Analysis"
+              accessibilityLabel="Navigate to Time Machine & Stress Test"
             >
               <View style={[styles.pillarIconBadge, { backgroundColor: BrandColors.tealLight }]}>
                 <ThemedText style={styles.pillarIconEmoji}>⏱</ThemedText>
               </View>
+              <ThemedText style={styles.stepCounterText}>STEP 3</ThemedText>
               <ThemedText type="title2" style={styles.pillarTitle}>
-                Understand your evidence
+                Test Changes
               </ThemedText>
               <ThemedText style={styles.pillarText}>
-                {t.home.timeMachineDesc}
+                Use Time Machine to simulate leaving out disputed evidence and check whether your case holds up under stress.
               </ThemedText>
               <View style={styles.pillarLinkRow}>
                 <ThemedText style={[styles.pillarLink, { color: BrandColors.teal }]}>
-                  See what matches and what is uncertain →
+                  Time Machine & Stress Test →
                 </ThemedText>
               </View>
             </Pressable>
 
-            {/* Pillar 3: Share Safely */}
+            {/* Step 4: Share Safely (Privacy Lens & PDF) */}
             <Pressable
               style={({ hovered, pressed }: any) => [
                 styles.pillarCard,
@@ -260,25 +331,26 @@ export default function HomeScreen() {
               ]}
               onPress={() => router.push('/privacy')}
               accessibilityRole="button"
-              accessibilityLabel="Navigate to Privacy & Sharing"
+              accessibilityLabel="Navigate to Privacy Lens"
             >
               <View style={[styles.pillarIconBadge, { backgroundColor: BrandColors.roseLight }]}>
                 <ThemedText style={styles.pillarIconEmoji}>🛡</ThemedText>
               </View>
+              <ThemedText style={styles.stepCounterText}>STEP 4</ThemedText>
               <ThemedText type="title2" style={styles.pillarTitle}>
-                {t.navigation.shareSafely}
+                Share Safely
               </ThemedText>
               <ThemedText style={styles.pillarText}>
-                {t.home.privacyLensDesc}
+                Apply role allowlists (Trusted Contact, Legal Professional) to redact private details before generating your report.
               </ThemedText>
               <View style={styles.pillarLinkRow}>
                 <ThemedText style={[styles.pillarLink, { color: BrandColors.rose }]}>
-                  {t.navigation.chooseWhatToShare} →
+                  Privacy Lens & PDF Export →
                 </ThemedText>
               </View>
             </Pressable>
 
-            {/* Pillar 4: Support & Remedies */}
+            {/* Step 5: Track Progress & Next Steps */}
             <Pressable
               style={({ hovered, pressed }: any) => [
                 styles.pillarCard,
@@ -289,21 +361,47 @@ export default function HomeScreen() {
               accessibilityRole="button"
               accessibilityLabel="Navigate to Support and Remedies"
             >
-              <View style={[styles.pillarIconBadge, { backgroundColor: BrandColors.mutedLight }]}>
-                <ThemedText style={styles.pillarIconEmoji}>⚖</ThemedText>
+              <View style={[styles.pillarIconBadge, { backgroundColor: '#E2E8F0' }]}>
+                <ThemedText style={styles.pillarIconEmoji}>📋</ThemedText>
               </View>
+              <ThemedText style={styles.stepCounterText}>STEP 5</ThemedText>
               <ThemedText type="title2" style={styles.pillarTitle}>
-                {t.navigation.supportSection}
+                Track Progress
               </ThemedText>
               <ThemedText style={styles.pillarText}>
-                {t.home.navigatorDesc}
+                Log institutional interactions in the Accountability Trail and access localized helplines and legal remedies.
               </ThemedText>
               <View style={styles.pillarLinkRow}>
                 <ThemedText style={[styles.pillarLink, { color: Colors.light.text }]}>
-                  {t.navigation.nextSteps} & {t.navigation.remediesJustice} →
+                  Accountability & Next Steps →
                 </ThemedText>
               </View>
             </Pressable>
+          </View>
+        </View>
+
+        {/* Technical Explanations Card for First-Time Users */}
+        <View style={styles.guideCard}>
+          <ThemedText type="title2" style={styles.guideTitle}>
+            📖 Understanding Assessment Labels & Tools
+          </ThemedText>
+          <View style={styles.guideGrid}>
+            <View style={styles.guideItem}>
+              <ThemedText type="smallBold" style={{ color: '#059669' }}>✓ SUPPORTED</ThemedText>
+              <ThemedText type="small" style={styles.guideText}>Active evidence files corroborate the recorded statement.</ThemedText>
+            </View>
+            <View style={styles.guideItem}>
+              <ThemedText type="smallBold" style={{ color: '#DC2626' }}>✕ CONFLICTED</ThemedText>
+              <ThemedText type="small" style={styles.guideText}>Contradictory timestamps or conflicting records exist across active sources.</ThemedText>
+            </View>
+            <View style={styles.guideItem}>
+              <ThemedText type="smallBold" style={{ color: '#475569' }}>○ UNVERIFIED</ThemedText>
+              <ThemedText type="small" style={styles.guideText}>No active evidence sources currently back this statement.</ThemedText>
+            </View>
+            <View style={styles.guideItem}>
+              <ThemedText type="smallBold" style={{ color: '#D97706' }}>⚠ REVIEW_NEEDED</ThemedText>
+              <ThemedText type="small" style={styles.guideText}>Cryptographic hash mismatch or only contradictory observations found.</ThemedText>
+            </View>
           </View>
         </View>
 
@@ -736,5 +834,72 @@ const styles = StyleSheet.create({
 
   pressed: {
     opacity: 0.85,
+  },
+
+  // 5-Step Journey & Contextual Guide additions
+  stepCounterText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: BrandColors.indigo,
+    letterSpacing: 0.5,
+    marginTop: 2,
+  },
+  caseSwitcherHeader: {
+    marginTop: 10,
+    gap: 4,
+  },
+  caseSwitchPrompt: {
+    fontSize: 11,
+    color: Colors.light.textSecondary,
+    fontWeight: '600',
+  },
+  casePillScroll: {
+    gap: 6,
+    paddingVertical: 2,
+  },
+  homeCasePill: {
+    backgroundColor: Colors.light.backgroundSubtle,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+  },
+  homeCasePillActive: {
+    backgroundColor: BrandColors.indigoLight,
+    borderColor: BrandColors.indigoBorder,
+  },
+  homeCasePillTextActive: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: BrandColors.indigo,
+  },
+  homeCasePillTextInactive: {
+    fontSize: 11,
+    color: Colors.light.textSecondary,
+  },
+  guideCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 18,
+    gap: 12,
+    marginBottom: 20,
+  },
+  guideTitle: {
+    fontSize: 15,
+    color: Colors.light.text,
+  },
+  guideGrid: {
+    gap: 10,
+  },
+  guideItem: {
+    gap: 2,
+  },
+  guideText: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+    lineHeight: 16,
   },
 });

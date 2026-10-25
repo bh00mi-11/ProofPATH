@@ -159,25 +159,27 @@ export function CaseProvider({ children }: { children: ReactNode }) {
 
       setExcludedEvidenceIds(nextExclusions);
       try {
-        const newScenario = await apiCaseService.runTimeMachineScenario(nextExclusions);
+        const activeId = currentCaseId || currentCase?.id || 'case_demo_01';
+        const newScenario = await apiCaseService.runTimeMachineScenario(nextExclusions, activeId);
         setScenarioResult(newScenario);
       } catch (err: any) {
         setBackendError(err?.message || 'Scenario calculation failed on backend');
       }
     },
-    [excludedEvidenceIds]
+    [currentCase, currentCaseId, excludedEvidenceIds]
   );
 
   // Restore Time Machine state back to baseline
   const restoreOriginalState = useCallback(async () => {
     setExcludedEvidenceIds([]);
     try {
-      const baselineScenario = await apiCaseService.runTimeMachineScenario([]);
+      const activeId = currentCaseId || currentCase?.id || 'case_demo_01';
+      const baselineScenario = await apiCaseService.runTimeMachineScenario([], activeId);
       setScenarioResult(baselineScenario);
     } catch (err: any) {
       setBackendError(err?.message || 'Scenario restore failed on backend');
     }
-  }, []);
+  }, [currentCase, currentCaseId]);
 
   // Update selected recipient for Privacy Preview
   const setSelectedRecipient = useCallback(

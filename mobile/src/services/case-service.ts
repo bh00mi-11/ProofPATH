@@ -32,7 +32,7 @@ export interface ICaseService {
   getObservations(caseId?: string): Promise<Observation[]>;
   getClaims(caseId?: string): Promise<Claim[]>;
   getPreparedScenarioResult(): Promise<ScenarioResult>;
-  runTimeMachineScenario(excludedEvidenceIds: string[]): Promise<ScenarioResult>;
+  runTimeMachineScenario(excludedEvidenceIds: string[], caseId?: string): Promise<ScenarioResult>;
   getDisclosurePreview(
     recipient: RecipientType,
     includedFields: string[],

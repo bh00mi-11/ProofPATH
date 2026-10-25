@@ -10,9 +10,38 @@ import { ClaimStatusBadge } from './ClaimStatusBadge';
 interface ClaimChangeCardProps {
   change: ClaimChange;
   claimStatement?: string;
+  excludedEvidenceNames?: string[];
+  evidenceList?: Array<{ id: string; name: string }>;
+  observationsList?: Array<{ id: string; evidenceId: string; field: string }>;
 }
 
-export function ClaimChangeCard({ change, claimStatement }: ClaimChangeCardProps) {
+export function ClaimChangeCard({
+  change,
+  claimStatement,
+  excludedEvidenceNames = [],
+  evidenceList = [],
+  observationsList = [],
+}: ClaimChangeCardProps) {
+  // Translate raw observation IDs into friendly filenames and fields
+  const formatFriendlyReason = (rawReason: string) => {
+    let text = rawReason;
+    if (evidenceList.length > 0 && observationsList.length > 0) {
+      const artMap = new Map(evidenceList.map((e) => [e.id, e.name]));
+      const obsMap = new Map(
+        observationsList.map((o) => {
+          const fname = artMap.get(o.evidenceId) || 'evidence file';
+          return [o.id, `${fname} (${o.field})`];
+        })
+      );
+
+      text = text.replace(/obs_[a-zA-Z0-9_]+/g, (match) => obsMap.get(match) || match);
+    }
+
+    return text
+      .replace(/observation\(s\)/gi, 'recorded evidence detail(s)')
+      .replace(/claim\(s\)/gi, 'statement(s)');
+  };
+
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
       {/* Header Disclaimer Tag */}
@@ -26,6 +55,22 @@ export function ClaimChangeCard({ change, claimStatement }: ClaimChangeCardProps
           Statement #{change.claimId}
         </ThemedText>
       </View>
+
+      {/* Excluded Evidence Banner */}
+      {excludedEvidenceNames.length > 0 && (
+        <View style={styles.excludedNoticeRow}>
+          <ThemedText type="smallBold" style={styles.excludedNoticeLabel}>
+            Testing without:
+          </ThemedText>
+          {excludedEvidenceNames.map((name, i) => (
+            <View key={i} style={styles.excludedPill}>
+              <ThemedText type="smallBold" style={styles.excludedPillText}>
+                ✕ {name}
+              </ThemedText>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Statement if available */}
       {claimStatement && (
@@ -61,7 +106,7 @@ export function ClaimChangeCard({ change, claimStatement }: ClaimChangeCardProps
           Why this changed:
         </ThemedText>
         <ThemedText type="small" style={styles.reasonText}>
-          {change.reason.replace(/observation\(s\)/gi, 'recorded detail(s)').replace(/claim\(s\)/gi, 'statement(s)')}
+          {formatFriendlyReason(change.reason)}
         </ThemedText>
       </View>
     </ThemedView>
@@ -101,6 +146,29 @@ const styles = StyleSheet.create({
   claimIdText: {
     fontSize: 12,
     opacity: 0.6,
+  },
+  excludedNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  excludedNoticeLabel: {
+    fontSize: 12,
+    color: '#B45309',
+  },
+  excludedPill: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  excludedPillText: {
+    fontSize: 11,
+    color: '#92400E',
   },
   statementText: {
     fontSize: 15,

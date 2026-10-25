@@ -384,8 +384,8 @@ export const apiCaseService: ICaseService & {
     return this.runTimeMachineScenario(['ev-01']);
   },
 
-  async runTimeMachineScenario(excludedEvidenceIds: string[]): Promise<ScenarioResult> {
-    return this.runScenario('case_demo_01', excludedEvidenceIds);
+  async runTimeMachineScenario(excludedEvidenceIds: string[], caseId: string = 'case_demo_01'): Promise<ScenarioResult> {
+    return this.runScenario(caseId, excludedEvidenceIds);
   },
 
   async createCase(title: string, description: string = ''): Promise<IncidentCase> {
