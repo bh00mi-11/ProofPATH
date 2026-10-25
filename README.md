@@ -40,6 +40,18 @@ The browser uses **one Vercel origin**, but FastAPI **runs on Render**, not Verc
 
 ---
 
+## Authentication and accountability release requirements (not yet implemented)
+
+**Status: BLOCKED for real personal data.** The hosted demo currently has no authentication or backend case-ownership checks. Login screens alone are insufficient; do not advertise this as a secure multi-user service.
+
+Required roles: **case owner** (can create, read, update, export and attach evidence only for their own cases) and **platform admin** (can manage demo accounts and operational health but cannot automatically read private evidence). Passwords must be securely hashed; sessions must be verified server-side; every case, artifact, observation, claim, PDF export, scenario, remedy, accountability and guardian endpoint must enforce authorization. Existing demo records need an explicit migration/ownership strategy, not automatic assignment to arbitrary users. Avoid storing auth tokens in insecure browser storage.
+
+**Accountability Trail:** The existing backend already implements user-created entries, append-only status-transition entries, evidence references and follow-up completion. A user can report their own actions and status; `DOCUMENT_SUPPORTED` means a document was attached, **not that an authority verified the status**. New work should add explicit actor identity, an immutable audit event for every change, user-facing action/status/evidence/follow-up controls, and clear `USER_REPORTED` versus independently verified labels. Admin must not impersonate an authority.
+
+**Release gate:** Test unauthenticated access (401), user A trying user B's case and evidence (403/404), cross-case attachment rejection, PDF authorization, expired sessions, and admin's inability to read evidence by default. Then run all backend and frontend tests and an end-to-end synthetic-data smoke test before merging to `main`.
+
+---
+
 ## Table of Contents
 
 - [Problem Statement](#problem-statement)
