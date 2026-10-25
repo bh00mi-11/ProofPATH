@@ -124,19 +124,19 @@ export default function IncidentDetailsScreen() {
               style={styles.actionBtnSecondary}
               onPress={() => router.push('/time-machine')}
             >
-              <ThemedText style={styles.actionBtnSecondaryText}>⏱ Test Leaving Out</ThemedText>
+              <ThemedText style={styles.actionBtnSecondaryText}>See what changes</ThemedText>
             </Pressable>
           </View>
 
           <ThemedView type="backgroundElement" style={styles.overviewCard}>
-            <ThemedText type="subtitle">How to understand your records</ThemedText>
-            <ThemedText type="small" style={styles.descriptionText}>1. Save a message or file.\n2. Connect recorded details to a statement.\n3. See which details support it or disagree.\n4. Review uncertainties before sharing. These results are not legal findings.</ThemedText>
+            <ThemedText type="subtitle">What happens next?</ThemedText>
+            <ThemedText type="small" style={styles.descriptionText}>Save a message or screenshot first. When you feel ready, review what it shows and decide whether to share it. You stay in control. The app does not make legal findings.</ThemedText>
           </ThemedView>
 
           {/* Associated Claims Section */}
           <View style={styles.sectionHeaderRow}>
             <ThemedText type="smallBold" style={styles.sectionHeader}>
-              STATEMENTS ({claims.length})
+              WHAT YOUR RECORDS SHOW ({claims.length})
             </ThemedText>
             <ThemedText type="small" style={styles.sectionSub}>
               Based on linked records, not a legal verdict
@@ -181,12 +181,12 @@ export default function IncidentDetailsScreen() {
                   <View style={styles.obsCountRow}>
                     <View style={styles.countBadgeSupport}>
                       <ThemedText type="smallBold" style={styles.supportCountText}>
-                        ✓ {claim.supportingObservationIds.length} Supporting details
+                        ✓ {claim.supportingObservationIds.length} matching details
                       </ThemedText>
                     </View>
                     <View style={styles.countBadgeConflict}>
                       <ThemedText type="smallBold" style={styles.conflictCountText}>
-                        ✕ {claim.conflictingObservationIds.length} Disagreeing details
+                        ? {claim.conflictingObservationIds.length} details to review
                       </ThemedText>
                     </View>
                   </View>
