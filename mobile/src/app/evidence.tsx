@@ -46,6 +46,7 @@ export default function EvidenceScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
+  const isHostedDemo = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app');
 
   // Add Evidence modal state
   const [modalVisible, setModalVisible] = useState(false);
@@ -415,6 +416,14 @@ export default function EvidenceScreen() {
             </ThemedText>
           </View>
 
+          {isHostedDemo && (
+            <ThemedView type="backgroundElement" style={styles.noticeBanner}>
+              <ThemedText type="smallBold" style={styles.noticeBannerTitle}>FICTIONAL DEMO RECORDS ONLY</ThemedText>
+              <ThemedText type="small" style={styles.noticeBannerText}>
+                For testing, you can read and analyze example records. Real screenshots, messages and personal details cannot be saved here. Use the local secure backend for development, not this public demo.
+              </ThemedText>
+            </ThemedView>
+          )}
           {/* Technical explanations are optional, not the first thing a person in distress sees. */}
           {showFilters && (
           <>
@@ -431,6 +440,7 @@ export default function EvidenceScreen() {
           </>
           )}
           {/* Quick Action Banner to Add Evidence */}
+          {!isHostedDemo && (
           <ThemedView type="backgroundElement" style={styles.uploadCtaCard}>
             <View style={styles.uploadCtaInfo}>
               <ThemedText type="subtitle" style={styles.uploadCtaTitle}>
@@ -451,6 +461,7 @@ export default function EvidenceScreen() {
               <ThemedText style={styles.openUploadBtnText}>+ Add Evidence</ThemedText>
             </Pressable>
           </ThemedView>
+          )}
 
           <Pressable accessibilityRole="button" onPress={() => setShowFilters((value) => !value)} style={{ paddingVertical: 12 }}>
             <ThemedText type="smallBold" style={styles.sectionHeader}>
@@ -536,7 +547,7 @@ export default function EvidenceScreen() {
               YOUR SAVED ITEMS ({sortedEvidence.length})
             </ThemedText>
             <View style={styles.sectionActionButtons}>
-              <Pressable
+              {!isHostedDemo && <Pressable
                 style={styles.addEvidenceSmallBtn}
                 onPress={() => {
                   setUploadError(null);
@@ -545,7 +556,7 @@ export default function EvidenceScreen() {
                 }}
               >
                 <ThemedText style={styles.addEvidenceSmallBtnText}>+ Add Evidence</ThemedText>
-              </Pressable>
+              </Pressable>}
               <Pressable
                 style={styles.addRecordBtn}
                 onPress={() => router.push(`/incident/${caseId}`)}
