@@ -61,6 +61,7 @@ export default function GuardianScreen() {
 
   const { width } = useWindowDimensions();
   const isDesktop = width >= 1024;
+  const isHostedDemo = Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname.endsWith('.vercel.app');
 
   const fetchContactsAndSession = useCallback(async () => {
     try {
@@ -274,6 +275,15 @@ export default function GuardianScreen() {
             </Pressable>
           </ThemedView>
 
+          {isHostedDemo ? (
+            <ThemedView type="backgroundElement" style={styles.disclaimerBanner}>
+              <ThemedText type="smallBold" style={styles.disclaimerTitle}>DEMO ONLY: NO CONTACT OR SOS STORAGE</ThemedText>
+              <ThemedText type="small" style={styles.disclaimerBody}>
+                This hosted preview uses fictional records and cannot save real contacts, start safety sessions or send emergency alerts. Use the 112 phone shortcut above in an emergency.
+              </ThemedText>
+            </ThemedView>
+          ) : (
+          <>
           {/* 2. Safety Session Control */}
           <ThemedView type="backgroundElement" style={styles.card}>
             <View style={styles.cardHeaderRow}>
@@ -483,6 +493,8 @@ export default function GuardianScreen() {
               </View>
             ) : null}
           </ThemedView>
+          </>
+          )}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
