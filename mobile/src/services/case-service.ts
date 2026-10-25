@@ -35,6 +35,7 @@ export interface ICaseService {
   runTimeMachineScenario(excludedEvidenceIds: string[]): Promise<ScenarioResult>;
   getDisclosurePreview(
     recipient: RecipientType,
-    includedFields: string[]
+    includedFields: string[],
+    caseId?: string
   ): Promise<DisclosurePreview>;
 }
