@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import type { ICaseService } from './case-service';
 import type {
   Claim,
@@ -35,6 +36,13 @@ function resolveDefaultApiBase(): string {
   // When running in a browser (web), route to same host on port 8000 automatically
   if (typeof window !== 'undefined' && window.location && window.location.hostname) {
     return `http://${window.location.hostname}:8000`;
+  }
+  // On a physical phone, localhost points to the phone, not the development computer.
+  // Expo's LAN host identifies the computer running Metro during local development.
+  const expoHost = Constants.expoConfig?.hostUri || Constants.expoGoConfig?.debuggerHost;
+  if (__DEV__ && expoHost) {
+    const host = expoHost.split(':')[0];
+    if (host && host !== 'localhost' && host !== '127.0.0.1') return `http://${host}:8000`;
   }
   // Android emulator routes host localhost to 10.0.2.2
   if (Platform.OS === 'android') {
